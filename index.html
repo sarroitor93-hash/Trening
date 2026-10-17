@@ -100,7 +100,9 @@ td.r,th.r{text-align:right}
 .badge{display:inline-block;font-family:var(--display);font-weight:700;font-size:14px;padding:1px 8px;border-radius:6px;background:var(--surface-2);margin-right:6px}
 .entry ul{margin:0;padding-left:16px;font-size:13px;color:var(--muted)}
 .del{border:0;background:transparent;color:var(--muted);font-size:12px;padding:4px}
-.del.arm{color:var(--danger);font-weight:600}
+.del.arm{color:var(--accent-fg);background:var(--danger);border-radius:999px;padding:4px 10px;font-weight:600}
+.confirm{display:inline-flex;align-items:center;gap:6px;color:var(--fg)}
+.del[data-cancel]{border:1px solid var(--line);border-radius:999px;padding:4px 10px}
 .empty{color:var(--muted);font-size:14px;margin:0}
 details summary{cursor:pointer;font-family:var(--display);font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:.04em}
 details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);display:grid;gap:4px}
@@ -377,7 +379,7 @@ function renderHist(){
     if(e.kind==="sila"){badge=`<span class="badge">${esc(e.type)}</span>${e.minimum?"minimum":""}`;body=`<ul>${(e.items||[]).filter(i=>(i.sets||[]).some(x=>x!=null)).map(i=>`<li>${esc(i.ex)}: ${fmt(i.w)} × ${(i.sets||[]).filter(x=>x!=null).join("/")}</li>`).join("")}</ul>`}
     else if(e.kind==="bieg"){badge=`<span class="badge">Bieg</span>${esc(e.runType)}`;body=`<ul><li>${fmt(e.km)} km · ${fmt(e.min)} min</li></ul>`}
     else{badge=`<span class="badge">Pomiar</span>`;body=`<ul><li>${fmt(e.kg)} kg${e.waist?" · talia "+fmt(e.waist)+" cm":""}</li></ul>`}
-    h+=`<div class="entry"><div class="entry-h"><span>${badge}</span><span class="num" style="font-size:13px;color:var(--muted)">${dt} <button class="del ${armed===e.id?"arm":""}" data-del="${esc(e.id)}">${armed===e.id?"Na pewno usunąć?":"Usuń"}</button></span></div>${body}</div>`;
+    h+=`<div class="entry"><div class="entry-h"><span>${badge}</span><span class="num" style="font-size:13px;color:var(--muted)">${dt} ${armed===e.id?`<span class="confirm">Usunąć? <button class="del arm" data-del="${esc(e.id)}">Tak, usuń</button><button class="del" data-cancel="1">Nie</button></span>`:`<button class="del" data-del="${esc(e.id)}">Usuń</button>`}</span></div>${body}</div>`;
   }
   return h+`</section><button class="ghost" id="open-setup">Ustawienia połączenia</button>`;
 }
@@ -430,6 +432,7 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.run){const f=bf(); f.t=b.dataset.run; if(f.t==="Test 5 km")f.km=5; ls.set("bieg-form",f); render(); return}
   if(b.id==="save-run"){const f=bf(); b.disabled=true; try{await addEntry({kind:"bieg",runType:f.t,km:f.km,min:f.min}); toast("Zapisano bieg w arkuszu")}catch(e){toast("Brak zasięgu · bieg czeka w kolejce")} render(); return}
   if(b.id==="save-pom"){const f=pf(); b.disabled=true; try{await addEntry({kind:"pomiar",kg:f.kg,waist:f.waist}); toast("Zapisano pomiar w arkuszu")}catch(e){toast("Brak zasięgu · pomiar czeka w kolejce")} render(); return}
+  if(b.dataset.cancel){armed=null;render();return}
   if(b.dataset.del){const id=b.dataset.del; if(armed===id){armed=null; try{await removeEntry(id); toast("Usunięto z arkusza")}catch(e){toast("Nie usunięto. Usuwanie działa tylko z internetem."); render()}} else {armed=id; render()} return}
 });
 document.addEventListener("change",ev=>{
