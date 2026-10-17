@@ -138,20 +138,26 @@ const fmt=n=>(Math.round(n*10)/10).toString().replace(".",",");
 const parse=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:null};
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 
-// ---------- Plan v1.1 ----------
+// ---------- Plan v1.2 ----------
 const KLATKA=["Wyciskanie hantli – skos","Wyciskanie hantli – płasko","Wyciskanie na maszynie","Wyciskanie sztangi – płasko","Rozpiętki (maszyna)"];
 const PLECY=["Ściąganie drążka / linki","Wiosłowanie hantlą","Wiosłowanie linką (dół)","Podciąganie"];
-const NOGI=["Uginanie nóg (maszyna)","Prostowanie nóg (maszyna)","RDL"];
+const UGIN=["Uginanie nóg siedząc (maszyna)","Uginanie nóg leżąc (maszyna)"];
+const PROST=["Prostowanie nóg (maszyna)"];
+const NOGI=[...UGIN,...PROST,"RDL"];
+const TYL=["Odwrotne rozpiętki (maszyna)","Odwrotne rozpiętki (hantle)","Face pull"];
+const LYDKI=["Wznosy na łydki stojąc","Wznosy na łydki siedząc","Wznosy na łydki na suwnicy"];
 const BOKI=["Odwodzenie linką","Odwodzenie hantlami","Odwodzenie na maszynie","Wyciskanie nad głowę – hantle","Wyciskanie nad głowę – maszyna"];
 const ABS=["Brzuszki na maszynie","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)","Spięcia na linie"];
 const BIC=["Uginanie – hantle","Uginanie – sztanga","Uginanie – linka"];
 const TRI=["Prostowanie linką w dół","Prostowanie linką nad głową","Prostowanie jednorącz"];
 const BW=["Podciąganie","Pompki","Pompki – nogi wyżej","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)"];
 const ALL=[...new Set(["Martwy ciąg","RDL","Przysiad hack","Suwnica","Przysiad ze sztangą",...KLATKA,...PLECY,...NOGI,...BOKI,...BIC,...TRI,...ABS,"Wznosy na łydki","Odwrotne rozpiętki","Face pull","Hip thrust","Wykroki","Dipy"])];
-const ARMS={id:"ramiona",title:"4 · Ramiona + brzuch",rule:"trójseria · do upadku · ok. 1,5 min",min:false,
+function arms(c){return {id:"ramiona",title:"4 · Ramiona + łydki"+(c?" + tył barków":" + brzuch"),rule:"czwórka w kółko · do upadku · ok. 1,5 min",min:false,
      ex:[{key:"biceps",label:"Biceps",opts:BIC,def:0,sets:2,lo:10,hi:15,unit:"kg",step:1},
-         {key:"triceps",label:"Triceps",opts:TRI,def:0,sets:2,lo:10,hi:15,unit:"kg",step:2.5},
-         {key:"brzuch",label:"Brzuch",opts:ABS,def:0,sets:2,lo:10,hi:20,unit:"kg",step:2.5,noProg:true}]};
+         {key:"triceps",label:"Triceps",opts:TRI,def:1,sets:2,lo:10,hi:15,unit:"kg",step:2.5},
+         {key:"lydki",label:"Łydki · pauza w dolnym rozciągnięciu",opts:LYDKI,def:0,sets:2,lo:10,hi:15,unit:"kg",step:5},
+         c?{key:"tyl",label:"Tył barków",opts:TYL,def:0,sets:2,lo:12,hi:20,unit:"kg",step:1}
+          :{key:"brzuch",label:"Brzuch",opts:ABS,def:0,sets:2,lo:10,hi:20,unit:"kg",step:2.5,noProg:true}]}}
 function plan(type){
   if(type==="Dom") return [
     {id:"dom",title:"Dom · EMOM 24 min",rule:"4 rundy × 6 min · reszta minuty = odpoczynek",
@@ -161,31 +167,25 @@ function plan(type){
          {key:"kohp",label:"Min 5",opts:["Wyciskanie kettla nad głowę (na stronę)","Push press (na stronę)"],def:0,sets:4,lo:6,hi:10,unit:"kg",step:4,noProg:true},
          {key:"pomp",label:"Min 6 · 1–2 przed upadkiem",opts:["Pompki","Pompki – nogi wyżej"],def:0,sets:4,lo:12,hi:25,unit:"kg",step:2.5,noProg:true}]}
   ];
-  if(type==="C") return [
-    {id:"gora",title:"1 · Klatka + plecy",rule:"superseria · do upadku · 2,5–3 min",min:true,
-     ex:[{key:"klatka",label:"Klatka",opts:KLATKA,def:1,sets:4,lo:6,hi:10,unit:"kg",step:2.5},
-         {key:"plecy",label:"Plecy",opts:PLECY,def:2,sets:4,lo:6,hi:10,unit:"kg",step:2.5}]},
-    {id:"boki",title:"2 · Boki barków",rule:"do upadku · przerwa ok. 1,5 min",min:false,
-     ex:[{key:"barki",label:"Boki barków",opts:BOKI,def:1,sets:3,lo:10,hi:20,unit:"kg",step:1}]},
-    Object.assign({},ARMS,{title:"3 · Ramiona + brzuch"})
-  ];
-  const A=type==="A";
+  const A=type==="A", C=type==="C", up=C?3:4;
+  const sila=A?{key:"silaA",label:"Zawias",opts:["Martwy ciąg"],def:0,sets:4,lo:3,hi:5,unit:"kg",step:2.5}
+    :C?{key:"silaC",label:"Zawias / nogi",opts:["RDL","Suwnica","Przysiad hack"],def:0,sets:4,lo:6,hi:10,unit:"kg",step:2.5}
+    :{key:"silaB",label:"Przysiad",opts:["Przysiad hack","Suwnica","Przysiad ze sztangą"],def:0,sets:4,lo:5,hi:6,unit:"kg",step:2.5};
   return [
-    {id:"skoki",title:"0 · Skoki",rule:"maks. wysokość · zejście krokiem · przerwa 60–90 s",nofail:true,min:false,
-     ex:[{key:"skoki",label:"Moc",opts:["Wskok na skrzynię","Skok w dal"],def:0,sets:3,lo:3,hi:3,unit:"cm",step:5,noProg:true}]},
-    {id:"sila",title:"1 · Siła",rule:"RIR 1–2 · nie do upadku",nofail:true,min:true,
-     ex:[A?{key:"silaA",label:"Zawias",opts:["Martwy ciąg"],def:0,sets:3,lo:3,hi:5,unit:"kg",step:2.5}
-          :{key:"silaB",label:"Przysiad",opts:["Przysiad hack","Suwnica","Przysiad ze sztangą"],def:0,sets:3,lo:5,hi:6,unit:"kg",step:2.5}]},
-    {id:"gora",title:"2 · Klatka + plecy",rule:"superseria · do upadku · 2,5–3 min",min:true,
-     ex:[{key:"klatka",label:"Klatka",opts:KLATKA,def:A?0:2,sets:4,lo:6,hi:10,unit:"kg",step:2.5},
-         {key:"plecy",label:"Plecy",opts:PLECY,def:A?0:1,sets:4,lo:6,hi:10,unit:"kg",step:2.5}]},
-    {id:"nogi",title:"3 · Nogi + boki barków",rule:"superseria · do upadku",min:false,
-     ex:[{key:"nogi",label:"Nogi",opts:NOGI,def:A?0:1,sets:2,lo:8,hi:12,unit:"kg",step:2.5},
-         {key:"barki",label:"Boki barków",opts:BOKI,def:A?0:1,sets:3,lo:10,hi:20,unit:"kg",step:1}]},
-    ARMS
+    {id:"skoki",title:"0 · Skoki",rule:"maks. odległość · pełny odpoczynek 60–90 s",nofail:true,min:false,
+     ex:[{key:"skoki",label:"Moc",opts:["Skok w dal","Wskok na skrzynię"],def:0,sets:3,lo:3,hi:3,unit:"cm",step:5,noProg:true}]},
+    {id:"sila",title:"1 · Siła",rule:"RIR 1–2 · nie do upadku",nofail:true,min:true,ex:[sila]},
+    {id:"gora",title:"2 · Klatka + plecy",rule:"superseria · 1 RIR, upadek tylko w ostatniej serii · 2,5–3 min",min:true,
+     ex:[{key:"klatka",label:"Klatka",opts:KLATKA,def:A?0:C?1:2,sets:up,lo:6,hi:10,unit:"kg",step:2.5},
+         {key:"plecy",label:"Plecy",opts:PLECY,def:A?0:C?2:1,sets:up,lo:6,hi:10,unit:"kg",step:2.5}]},
+    {id:"nogi",title:"3 · Uda + boki barków",rule:"trójseria · do upadku · boki 3. seria solo",min:false,
+     ex:[{key:"ugin",label:"Tył uda",opts:UGIN,def:0,sets:2,lo:8,hi:12,unit:"kg",step:2.5},
+         {key:"prost",label:"Przód uda",opts:PROST,def:0,sets:2,lo:8,hi:12,unit:"kg",step:2.5},
+         {key:"barki",label:"Boki barków",opts:BOKI,def:A?0:C?2:1,sets:3,lo:10,hi:20,unit:"kg",step:1}]},
+    arms(C)
   ];
 }
-const START={"Martwy ciąg":110,"Brzuszki na maszynie":20,"Spięcia na linie":20,"Deska (sek.)":0,"Tabata brzuch (rundy)":0,"Wyciskanie hantli – skos":27.5,"Suwnica":150,"Podciąganie":0,"Wskok na skrzynię":60,"Skok w dal":220,
+const START={"Martwy ciąg":110,"Brzuszki na maszynie":20,"Spięcia na linie":20,"Deska (sek.)":0,"Tabata brzuch (rundy)":0,"Wyciskanie hantli – skos":27.5,"Suwnica":150,"Podciąganie":0,"Wskok na skrzynię":60,"Skok w dal":220,"RDL":80,"Prostowanie nóg (maszyna)":50,"Uginanie nóg siedząc (maszyna)":40,
   "Swingi":20,"Wykroki bułgarskie (na nogę)":20,"Wiosłowanie kettlem (na stronę)":20,"Wyciskanie kettla nad głowę (na stronę)":20,"Push press (na stronę)":20,"Pompki":0,"Pompki – nogi wyżej":0};
 
 // ---------- Store: Google Sheet via Apps Script API (offline queue) ----------
@@ -250,7 +250,7 @@ window.addEventListener("offline",syncLabel);
 
 // ---------- Derived from history ----------
 const strength=()=>entries.filter(e=>e.kind==="sila");
-function nextType(){const s=strength().find(e=>e.type==="A"||e.type==="B");return s?(s.type==="A"?"B":"A"):"A"}
+function nextType(){const s=strength().find(e=>["A","B","C"].includes(e.type));return s?({A:"B",B:"C",C:"A"})[s.type]:"A"}
 function lastFor(exName){for(const e of strength()){const it=(e.items||[]).find(i=>i.ex===exName);if(it)return it}return null}
 function lastChoice(type,key){for(const e of strength()){if(e.type!==type)continue;const it=(e.items||[]).find(i=>i.key===key);if(it)return it.ex}return null}
 const e1rm=(w,r)=>r>0?w*(1+r/30):0;
@@ -310,7 +310,7 @@ function renderSila(){
   let h=`<div class="bar"><div class="seg" role="group" aria-label="Sesja">
     ${["A","B","C","Dom"].map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
     ${dom?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">Tryb minimum</button>`}</div>
-    <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka A/B idzie dalej.":c?"Sesja C: bonus na górę ciała, gdy trafi się 3. trening w tygodniu. Nie przesuwa kolejki A/B.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+nextType()+"</b>. Kolejka A → B, niezależnie od dnia tygodnia."}</p>`;
+    <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka A → B → C idzie dalej.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+nextType()+"</b>. Kolejka A → B → C, niezależnie od dnia. Dzień po dniu: nie rób C po A ani A po C (dwa razy zawias)."}</p>`;
   for(const s of P){
     if(draft.minimum&&!dom&&!s.min) continue;
     h+=`<section class="slot"><div class="slot-h"><h2>${s.title}</h2><span class="rule ${s.nofail?"nofail":""}">${s.rule}</span></div>`;
