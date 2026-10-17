@@ -109,6 +109,13 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 .rest{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
   padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:center;gap:12px}
 .rest .t{font-family:var(--display);font-weight:700;font-size:28px}
+.rest.over{background:var(--done-bg);border-top-color:var(--done)}
+.rest.over .t{color:var(--done)}
+.rest-b{display:flex;gap:6px}
+.rest-b .ghost{padding:8px 10px}
+.restctl{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.restctl b{font-family:var(--display);font-size:18px;color:var(--fg);min-width:40px;text-align:center}
+.restctl .mini{padding:2px 10px;font-size:15px}
 .rest .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:14px;z-index:7;max-width:calc(100% - 32px);text-align:center}
 .tm-card .chips{flex-wrap:wrap;overflow:visible}
@@ -149,7 +156,7 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 </header>
 <main id="main"></main>
 </div>
-<div class="rest" id="rest" hidden><div><div class="l">Przerwa</div><div class="t num" id="rest-t">0:00</div></div><div class="l">od ostatniej serii</div><button class="ghost" id="rest-x">Ukryj</button></div>
+<div class="rest" id="rest" hidden><div><div class="l" id="rest-l">Przerwa</div><div class="t num" id="rest-t">0:00</div></div><div class="rest-b"><button class="ghost" id="rest-m">−15 s</button><button class="ghost" id="rest-p">+15 s</button><button class="ghost" id="rest-x">Stop</button></div></div>
 <div class="toast" id="toast" hidden></div>
 <div class="timer" id="timer" hidden></div>
 
@@ -175,7 +182,7 @@ const BIC=["Uginanie – hantle","Uginanie – sztanga","Uginanie – linka"];
 const TRI=["Prostowanie linką w dół","Prostowanie linką nad głową","Prostowanie jednorącz"];
 const BW=["Podciąganie","Pompki","Pompki – nogi wyżej","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)"];
 const ALL=[...new Set(["Martwy ciąg","RDL","Przysiad hack","Suwnica","Przysiad ze sztangą",...KLATKA,...PLECY,...NOGI,...BOKI,...BIC,...TRI,...ABS,"Wznosy na łydki","Odwrotne rozpiętki","Face pull","Hip thrust","Wykroki","Dipy"])];
-function arms(){return {id:"ramiona",title:"4 · Biceps + triceps",rule:"superseria · do upadku · ok. 1,5 min",min:false,
+function arms(){return {id:"ramiona",rest:90,title:"4 · Biceps + triceps",rule:"superseria · do upadku",min:false,
      ex:[{key:"biceps",label:"Biceps",opts:BIC,def:0,sets:2,lo:10,hi:15,unit:"kg",step:1},
          {key:"triceps",label:"Triceps",opts:TRI,def:1,sets:2,lo:10,hi:15,unit:"kg",step:2.5}]}}
 function plan(type){
@@ -192,17 +199,17 @@ function plan(type){
     :C?{key:"silaC",label:"Zawias / nogi",opts:["RDL","Suwnica","Przysiad hack"],def:0,sets:4,lo:6,hi:10,unit:"kg",step:2.5}
     :{key:"silaB",label:"Przysiad",opts:["Przysiad hack","Suwnica","Przysiad ze sztangą"],def:0,sets:4,lo:5,hi:6,unit:"kg",step:2.5};
   return [
-    {id:"skoki",title:"0 · Skoki",rule:"maks. wysokość · zejście krokiem · pełny odpoczynek 60–90 s",nofail:true,min:false,
+    {id:"skoki",rest:90,title:"0 · Skoki",rule:"maks. wysokość · zejście krokiem · pełny odpoczynek 60–90 s",nofail:true,min:false,
      ex:[{key:"skoki",label:"Moc",opts:["Wskok na skrzynię","Skok w dal"],def:0,sets:3,lo:3,hi:3,unit:"cm",step:5,noProg:true}]},
-    {id:"sila",title:"1 · Siła",rule:"RIR 1–2 · nie do upadku",nofail:true,min:true,ex:[sila]},
-    {id:"gora",title:"2 · Klatka + plecy",rule:"superseria · 1 RIR, upadek tylko w ostatniej serii · 2,5–3 min",min:true,
+    {id:"sila",rest:180,title:"1 · Siła",rule:"RIR 1–2 · nie do upadku",nofail:true,min:true,ex:[sila]},
+    {id:"gora",rest:150,title:"2 · Klatka + plecy",rule:"superseria · 1 RIR, upadek tylko w ostatniej serii",min:true,
      ex:[{key:"klatka",label:"Klatka",opts:KLATKA,def:A?0:C?1:2,sets:up,lo:6,hi:10,unit:"kg",step:2.5},
          {key:"plecy",label:"Plecy",opts:PLECY,def:A?0:C?2:1,sets:up,lo:6,hi:10,unit:"kg",step:2.5}]},
-    {id:"nogi",title:"3 · Nogi + boki barków",rule:"superseria · do upadku",min:false,
+    {id:"nogi",rest:90,title:"3 · Nogi + boki barków",rule:"superseria · do upadku",min:false,
      ex:[{key:"nogi",label:A?"Nogi · po martwym: przód uda":C?"Nogi · po RDL: przód uda":"Nogi · po przysiadzie: tył uda",opts:[...PROST,...UGIN],def:C||A?0:1,sets:3,lo:8,hi:12,unit:"kg",step:2.5},
          {key:"barki",label:"Barki",opts:[...BOKI,...TYL],def:A?0:C?2:1,sets:3,lo:10,hi:20,unit:"kg",step:1}]},
     arms(),
-    {id:"brzuch",title:"5 · Brzuch (jeśli jest czas)",rule:"opcjonalnie · 2 serie",min:false,
+    {id:"brzuch",rest:60,title:"5 · Brzuch (jeśli jest czas)",rule:"opcjonalnie · 2 serie",min:false,
      ex:[{key:"brzuch",label:"Brzuch",opts:ABS,def:0,sets:2,lo:10,hi:20,unit:"kg",step:2.5,noProg:true}]}
   ];
 }
@@ -291,12 +298,23 @@ const XEX={step:2.5,unit:"kg",lo:8,hi:12,sets:3,noProg:true};
 function repUnit(name){return /sek\./.test(name)?"sek.":/rundy/.test(name)?"rundy":"powt."}
 function allItems(){const out=[];for(const s of plan(draft.type))for(const ex of s.ex){const it=draft.items[ex.key];if(it&&!it.skip)out.push([ex.key,it])}for(const x of (draft.extras||[]))if(x.ex)out.push(["extra",x]);return out}
 
-// ---------- Rest timer ----------
-let restAt=null,restTick=null;
-function startRest(){restAt=Date.now();$("#rest").hidden=false;if(!restTick)restTick=setInterval(drawRest,1000);drawRest()}
-function stopRest(){restAt=null;$("#rest").hidden=true;clearInterval(restTick);restTick=null}
-function drawRest(){if(!restAt)return;const s=Math.floor((Date.now()-restAt)/1000);$("#rest-t").textContent=Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
+// ---------- Rest timer (countdown) ----------
+let restCfg=ls.get("rest-cfg",{}),restAt=null,restDur=0,restTick=null,restBeeped=false;
+const restFor=sl=>restCfg[sl.id]!=null?restCfg[sl.id]:(sl.rest||90);
+function slotOf(key){if(!draft||key[0]==="x")return null;for(const sl of plan(draft.type))if(sl.ex.some(e=>e.key===key))return sl;return null}
+function startRest(sec){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
+  restAt=Date.now();restDur=sec||90;restBeeped=false;$("#rest").hidden=false;if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
+function stopRest(){restAt=null;$("#rest").hidden=true;clearInterval(restTick);restTick=null;$("#rest").classList.remove("over")}
+function drawRest(){if(!restAt)return;const left=restDur-(Date.now()-restAt)/1000,el=$("#rest");
+  if(left<=3&&left>0&&Math.ceil(left)!==drawRest.last){drawRest.last=Math.ceil(left);beep(660,110)}
+  if(left<=0&&!restBeeped){restBeeped=true;beep(880,600);try{navigator.vibrate&&navigator.vibrate([250,100,250])}catch(e){}}
+  el.classList.toggle("over",left<=0);
+  $("#rest-l").textContent=left>0?"Przerwa":"Czas na serię";
+  $("#rest-t").textContent=(left>0?"":"+")+mmssR(Math.abs(left))}
+function mmssR(x){x=Math.max(0,Math.ceil(x));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
 $("#rest-x").addEventListener("click",stopRest);
+$("#rest-m").addEventListener("click",()=>{restDur=Math.max(0,restDur-15);restBeeped=false;drawRest()});
+$("#rest-p").addEventListener("click",()=>{restDur+=15;restBeeped=false;drawRest()});
 function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2400)}
 
 // ---------- Rendering ----------
@@ -335,7 +353,7 @@ function renderSila(){
   if(dom) h+=renderTimerCard();
   for(const s of P){
     if(draft.minimum&&!dom&&!s.min) continue;
-    h+=`<section class="slot"><div class="slot-h"><h2>${s.title}</h2><span class="rule ${s.nofail?"nofail":""}">${s.rule}</span></div>`;
+    h+=`<section class="slot"><div class="slot-h"><h2>${s.title}</h2><span class="rule ${s.nofail?"nofail":""}">${s.rule}</span></div>${dom?"":`<div class="restctl">Przerwa <button class="mini" data-rdec="${s.id}" aria-label="Krócej">−</button><b class="num">${mmssR(restFor(s))}</b><button class="mini" data-rinc="${s.id}" aria-label="Dłużej">+</button><button class="mini" data-rgo="${s.id}">▶ Start</button></div>`}`;
     for(const ex of s.ex){const it=draft.items[ex.key]; if(!it) continue; const n=(dom?ex.sets:setsFor(ex))+(it.plus||0); h+=exBlock(ex,it,ex.key,n,dom,false)}
     h+=`</section>`;
   }
@@ -545,6 +563,8 @@ function bump(id,dir){
 document.addEventListener("click",async ev=>{
   const b=ev.target.closest("button"); if(!b) return;
   if(timerClick(b)) return;
+  if(b.dataset.rdec||b.dataset.rinc){const id=b.dataset.rdec||b.dataset.rinc,sl=plan(draft.type).find(x=>x.id===id);restCfg[id]=Math.max(15,restFor(sl)+(b.dataset.rinc?15:-15));ls.set("rest-cfg",restCfg);render();return}
+  if(b.dataset.rgo){const sl=plan(draft.type).find(x=>x.id===b.dataset.rgo);startRest(restFor(sl));return}
   if(b.id==="open-setup"){tab="setup";render();return}
   if(b.id==="cfg-save"){const u=$("#cfg-url").value.trim(),k=$("#cfg-key").value.trim(); if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){toast("Adres musi zaczynać się od https://script.google.com i kończyć na /exec");return}
     b.disabled=true;b.textContent="Sprawdzam…";
@@ -561,7 +581,7 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.addset){const it=itemOf(b.dataset.addset); it.plus=(it.plus||0)+1; saveDraft(); render(); return}
   if(b.dataset.other){const it=draft.items[b.dataset.other]; it.other=true; saveDraft(); render(); const el=document.querySelector(`[data-name-for="${b.dataset.other}"]`); if(el) el.focus(); return}
   if(b.id==="add-ex"){draft.extras.push({ex:"",w:0,r:XEX.hi,sets:Array(XEX.sets).fill(null)}); saveDraft(); render(); const els=document.querySelectorAll("[data-name-for^='x']"); if(els.length) els[els.length-1].focus(); return}
-  if(b.dataset.set){const it=itemOf(b.dataset.set),i=+b.dataset.i; if(it.sets[i]!=null)it.sets[i]=null; else {it.sets[i]=it.r;startRest()} delete draft.auto; saveDraft(); render(); return}
+  if(b.dataset.set){const it=itemOf(b.dataset.set),i=+b.dataset.i; if(it.sets[i]!=null)it.sets[i]=null; else {it.sets[i]=it.r;const sl=slotOf(b.dataset.set);if(draft.type!=="Dom")startRest(sl?restFor(sl):90)} delete draft.auto; saveDraft(); render(); return}
   if(b.id==="reset"){draft=newDraft(nextType(),false);draft.auto=true;saveDraft();render();return}
   if(b.id==="save"){
     b.disabled=true; b.textContent="Zapisuję…";
