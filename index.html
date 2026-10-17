@@ -414,19 +414,36 @@ function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="s
 
 // ---------- Home timer (stoper) ----------
 const HOME=[
- {id:"swing",name:"Swingi",reps:"20 powt.",key:"swing"},
- {id:"goblet",name:"Goblet squat",reps:"15 powt."},
- {id:"bulgL",name:"Bułgarskie – lewa",reps:"8–10 powt.",key:"bulg"},
- {id:"bulgP",name:"Bułgarskie – prawa",reps:"8–10 powt.",key:"bulg"},
- {id:"row",name:"Wiosłowanie L+P",reps:"10–12 / stronę",key:"krow"},
- {id:"ohp",name:"Wyciskanie nad głowę L+P",reps:"6–10 / stronę",key:"kohp",opt:"Wyciskanie kettla nad głowę (na stronę)"},
- {id:"pp",name:"Push press L+P",reps:"6 / stronę",key:"kohp",opt:"Push press (na stronę)"},
- {id:"push",name:"Pompki",reps:"1–2 przed upadkiem",key:"pomp",opt:"Pompki"},
- {id:"pushF",name:"Pompki – nogi wyżej",reps:"1–2 przed upadkiem",key:"pomp",opt:"Pompki – nogi wyżej"},
- {id:"plank",name:"Deska",reps:"do końca interwału"},
- {id:"abs",name:"Brzuch",reps:"dowolne ćwiczenie"},
- {id:"rest",name:"Odpoczynek",reps:""}];
-const HB=Object.fromEntries(HOME.map(h=>[h.id,h]));
+ {id:"swing",g:"k",name:"Swingi",reps:"20 powt.",key:"swing",n:20},
+ {id:"swing1",g:"k",name:"Swingi jednorącz L+P",reps:"10 / stronę",n:10},
+ {id:"clean",g:"k",name:"Clean L+P",reps:"8 / stronę",n:8},
+ {id:"cpress",g:"k",name:"Clean & press L+P",reps:"5 / stronę",n:5},
+ {id:"snatch",g:"k",name:"Rwanie (snatch) L+P",reps:"8 / stronę",n:8},
+ {id:"hpull",g:"k",name:"High pull L+P",reps:"10 / stronę",n:10},
+ {id:"goblet",g:"k",name:"Goblet squat",reps:"15 powt.",n:15},
+ {id:"fsq",g:"k",name:"Przysiad z kettlem w racku L+P",reps:"8 / stronę",n:8},
+ {id:"thruster",g:"k",name:"Thruster L+P",reps:"6 / stronę",n:6},
+ {id:"bulgL",g:"k",name:"Bułgarskie – lewa",reps:"8–10 powt.",key:"bulg",n:10},
+ {id:"bulgP",g:"k",name:"Bułgarskie – prawa",reps:"8–10 powt.",key:"bulg",n:10},
+ {id:"lunge",g:"k",name:"Wykroki z kettlem L+P",reps:"8 / stronę",n:8},
+ {id:"sldl",g:"k",name:"Martwy ciąg na 1 nodze L+P",reps:"8 / stronę",n:8},
+ {id:"row",g:"k",name:"Wiosłowanie L+P",reps:"10–12 / stronę",key:"krow",n:12},
+ {id:"ohp",g:"k",name:"Wyciskanie nad głowę L+P",reps:"6–10 / stronę",key:"kohp",opt:"Wyciskanie kettla nad głowę (na stronę)",n:8},
+ {id:"pp",g:"k",name:"Push press L+P",reps:"6 / stronę",key:"kohp",opt:"Push press (na stronę)",n:6},
+ {id:"tgu",g:"k",name:"Turkish get-up L/P na zmianę",reps:"1–2 / stronę",n:2},
+ {id:"windmill",g:"k",name:"Wiatrak (windmill) L+P",reps:"5 / stronę",n:5},
+ {id:"halo",g:"k",name:"Halo",reps:"5 w każdą stronę",n:10},
+ {id:"carry",g:"k",name:"Spacer z kettlem (suitcase) L+P",reps:"do końca interwału",n:1},
+ {id:"push",g:"b",name:"Pompki",reps:"1–2 przed upadkiem",key:"pomp",opt:"Pompki",n:15},
+ {id:"pushF",g:"b",name:"Pompki – nogi wyżej",reps:"1–2 przed upadkiem",key:"pomp",opt:"Pompki – nogi wyżej",n:12},
+ {id:"burpee",g:"b",name:"Burpees",reps:"10 powt.",n:10},
+ {id:"jsq",g:"b",name:"Przysiady z wyskokiem",reps:"10 powt.",n:10},
+ {id:"climber",g:"b",name:"Wspinaczka (mountain climbers)",reps:"do końca interwału",n:30},
+ {id:"plank",g:"b",name:"Deska",reps:"do końca interwału",n:45},
+ {id:"abs",g:"b",name:"Brzuch",reps:"dowolne ćwiczenie",n:15},
+ {id:"rest",g:"b",name:"Odpoczynek",reps:""}];
+const HB0=Object.fromEntries(HOME.map(h=>[h.id,h]));
+const HB=new Proxy(HB0,{get:(o,id)=>o[id]||(typeof id==="string"&&id.startsWith("c:")?{id,g:"c",name:id.slice(2),reps:"",n:10}:{id,name:String(id),reps:""})});
 const TMODES={emom:{label:"EMOM",work:60,rest:0,rounds:4},tabata:{label:"Tabata",work:20,rest:10,rounds:8},int:{label:"Praca / przerwa",work:40,rest:20,rounds:4}};
 const tdef=()=>({mode:"emom",work:60,rest:0,rounds:4,list:["swing","bulgL","bulgP","row","ohp","push"]});
 let tc=ls.get("timer-cfg",null)||tdef();
@@ -440,7 +457,9 @@ function renderTimerCard(){
    <div class="two">${tc.mode==="emom"?stepper("t-work",tc.work,"sek. na ćwiczenie"):stepper("t-work",tc.work,"praca · sek.")}${tc.mode==="emom"?stepper("t-rounds",tc.rounds,"rundy"):stepper("t-rest",tc.rest,"przerwa · sek.")}</div>
    ${tc.mode==="emom"?"":`<div class="two">${stepper("t-rounds",tc.rounds,"rundy")}<div></div></div>`}
    <ol class="tm-list">${tc.list.map((id,i)=>`<li><b>${i+1}</b><span>${esc(HB[id].name)} <small>${esc(HB[id].reps)}</small></span>${i?`<button class="mini" data-tup="${i}" aria-label="W górę">↑</button>`:""}<button class="mini" data-tdel="${i}" aria-label="Usuń">✕</button></li>`).join("")||`<li><span class="hint">Dodaj ćwiczenia poniżej</span></li>`}</ol>
-   <div class="chips">${HOME.map(h=>`<button class="chip" data-tadd="${h.id}">+ ${esc(h.name)}</button>`).join("")}</div>
+   <span class="ex-label">Dodaj · kettle</span><div class="chips">${HOME.filter(h=>h.g==="k").map(h=>`<button class="chip" data-tadd="${h.id}">+ ${esc(h.name)}</button>`).join("")}</div>
+   <span class="ex-label">Dodaj · masa ciała</span><div class="chips">${HOME.filter(h=>h.g==="b").map(h=>`<button class="chip" data-tadd="${h.id}">+ ${esc(h.name)}</button>`).join("")}</div>
+   <div class="row"><input class="name" id="t-custom" placeholder="Własne ćwiczenie, np. Double clean"><button class="ghost" id="t-addc">Dodaj</button></div>
    <p class="hint num">Runda = ${tc.list.length} × ${tc.work} s${tc.rest?` + przerwy ${tc.rest} s`:""}. Razem ok. <b>${mmss(total)}</b> min.</p>
    <div class="two"><button class="ghost" id="t-preset">Mój EMOM 24 min</button><button class="primary" id="t-start" ${tc.list.length?"":"disabled"}>▶ Start</button></div></section>`}
 let T=null,actx=null,wake=null;
@@ -491,7 +510,8 @@ function tFill(){
   for(const s of plan("Dom"))for(const ex of s.ex)if(!keys.has(ex.key)&&draft.items[ex.key]&&!draft.items[ex.key].sets.some(x=>x!=null))draft.items[ex.key].skip=true;
   const extra=[...new Set(tc.list.filter(id=>!HB[id].key&&id!=="rest"))];
   draft.extras=draft.extras||[];
-  for(const id of extra)draft.extras.push({ex:HB[id].name+(id==="plank"?" (sek.)":""),w:id==="goblet"?20:0,r:id==="plank"?tc.work:id==="goblet"?15:12,sets:Array(T.doneRounds).fill(id==="plank"?tc.work:id==="goblet"?15:12),plus:Math.max(0,T.doneRounds-3)});
+  for(const id of extra){const h=HB[id],sec=/do końca interwału/.test(h.reps),r=sec?tc.work:(h.n||10);
+    draft.extras.push({ex:h.name+(sec?" (sek.)":""),w:h.g==="k"||h.g==="c"?20:0,r,sets:Array(T.doneRounds).fill(r),plus:Math.max(0,T.doneRounds-3)})}
   delete draft.auto;saveDraft();tClose();toast("Odhaczone. Popraw liczby, jeśli trzeba, i zapisz trening.")}
 function tClose(){if(T&&T.h)clearInterval(T.h);try{wake&&wake.release()}catch(e){}wake=null;T=null;$("#timer").hidden=true;render()}
 function timerClick(b){
@@ -499,6 +519,7 @@ function timerClick(b){
   if(b.dataset.tadd){tc.list.push(b.dataset.tadd);saveTc();render();return true}
   if(b.dataset.tdel){tc.list.splice(+b.dataset.tdel,1);saveTc();render();return true}
   if(b.dataset.tup){const i=+b.dataset.tup;[tc.list[i-1],tc.list[i]]=[tc.list[i],tc.list[i-1]];saveTc();render();return true}
+  if(b.id==="t-addc"){const v=($("#t-custom").value||"").trim();if(v){tc.list.push("c:"+v);saveTc();render()}return true}
   if(b.id==="t-preset"){tc=tdef();saveTc();render();return true}
   if(b.id==="t-start"){tStart();return true}
   if(b.id==="t-pause"){if(T.pauseAt){T.t0+=Date.now()-T.pauseAt;T.pauseAt=0}else T.pauseAt=Date.now();tTick();return true}
@@ -559,6 +580,7 @@ document.addEventListener("change",ev=>{
   const el=ev.target; if(el.tagName!=="INPUT") return;
   if(el.dataset.nameFor){const k=el.dataset.nameFor,it=itemOf(k),name=el.value.trim(); if(name){it.ex=name; const last=lastFor(name); if(last) it.w=last.w; it.other=false} saveDraft(); render(); return}
   const v=parse(el.value);
+  if(el.id==="t-custom") return;
   if(el.id.startsWith("t-")){const f=el.id.slice(2);if(v!=null)tc[f]=Math.max(f==="rest"?0:1,Math.round(v));saveTc();render();return}
   if(tab==="sila"){const [kind,key]=el.id.split("-"),it=itemOf(key); if(v!=null){ if(kind==="w")it.w=Math.max(0,v); else it.r=Math.max(1,Math.round(v)); saveDraft() }}
   else if(tab==="bieg"){const b=bf(); if(v!=null) b[el.id]=v; ls.set("bieg-form",b)}
