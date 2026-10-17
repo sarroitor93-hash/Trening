@@ -111,6 +111,28 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 .rest .t{font-family:var(--display);font-weight:700;font-size:28px}
 .rest .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:14px;z-index:7;max-width:calc(100% - 32px);text-align:center}
+.tm-card .chips{flex-wrap:wrap;overflow:visible}
+.tm-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.tm-list li{display:flex;align-items:center;gap:8px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:14px}
+.tm-list li b{font-family:var(--display);font-size:16px;min-width:20px;color:var(--muted)}
+.tm-list li span{flex:1}
+.tm-list li small{color:var(--muted);font-size:12px}
+.timer{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;justify-content:space-between;gap:12px;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.timer.work{background:color-mix(in srgb,var(--done) 14%,var(--bg))}
+.timer.rest,.timer.prep{background:color-mix(in srgb,var(--warn) 14%,var(--bg))}
+.tm-top{display:flex;justify-content:space-between;font-size:14px;color:var(--muted)}
+.tm-mid{text-align:center;display:grid;gap:6px}
+.tm-phase{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.tm-ex{font-family:var(--display);font-weight:700;font-size:clamp(30px,9vw,48px);line-height:1.05;text-transform:uppercase}
+.tm-reps{font-size:18px;color:var(--muted)}
+.tm-clock{font-family:var(--display);font-weight:700;font-size:clamp(96px,32vw,180px);line-height:1}
+.tm-next{font-size:16px;color:var(--muted)}
+.tm-next b{color:var(--fg)}
+.tm-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.tm-bar i{display:block;height:100%;background:var(--accent)}
+.tm-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tm-btns button{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:14px 0;font-family:var(--display);font-weight:700;font-size:18px;text-transform:uppercase}
 @media (prefers-reduced-motion:no-preference){.set,.chip,.tabs button{transition:background .12s,color .12s,border-color .12s}}
 </style>
 </head>
@@ -129,6 +151,7 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 </div>
 <div class="rest" id="rest" hidden><div><div class="l">Przerwa</div><div class="t num" id="rest-t">0:00</div></div><div class="l">od ostatniej serii</div><button class="ghost" id="rest-x">Ukryj</button></div>
 <div class="toast" id="toast" hidden></div>
+<div class="timer" id="timer" hidden></div>
 
 <script>
 (function(){
@@ -309,6 +332,7 @@ function renderSila(){
     ${["A","B","C","Dom"].map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
     ${dom?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">Tryb minimum</button>`}</div>
     <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka A → B → C idzie dalej.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+nextType()+"</b>. Kolejka A → B → C, niezależnie od dnia. Dzień po dniu: nie rób C po A ani A po C (dwa razy zawias)."}</p>`;
+  if(dom) h+=renderTimerCard();
   for(const s of P){
     if(draft.minimum&&!dom&&!s.min) continue;
     h+=`<section class="slot"><div class="slot-h"><h2>${s.title}</h2><span class="rule ${s.nofail?"nofail":""}">${s.rule}</span></div>`;
@@ -321,16 +345,15 @@ function renderSila(){
     <button class="primary" id="save" ${draftHasSets()?"":"disabled"}>Zapisz trening</button>
     <button class="ghost" id="reset">Wyczyść bieżący trening</button>
     <datalist id="all-ex">${ALL.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
-    <details class="card"><summary>Zasady planu v1.1</summary><ul>
-      <li>Wybierz ćwiczenie, ustaw ciężar i powtórzenia, dotknij kółka serii. Ponowne dotknięcie kasuje serię.</li>
-      <li>„Inne…” zamienia ćwiczenie na dowolne. „Pomiń” wyłącza je tylko w tym treningu. „+ seria” dodaje serię.</li>
-      <li>Slot 1 (siła) kończysz z 1–2 powt. w zapasie. Reszta do upadku lub tuż przed.</li>
-      <li>Progresja: powtórzenia mogą spadać z serii na serię. Gdy 1. i 2. seria dojdą do górnej granicy zakresu, dokładasz ciężar.</li>
-      <li>Boki barków w każdej sesji. Wyciskanie nad głowę tylko jako zamiennik.</li>
-      <li>3. trening w tygodniu = sesja C (sama góra).</li>
-      <li>Odciążenie: gdy 2 sesje z rzędu spadają ciężary lub powtórzenia, następny tydzień o połowę mniej serii.</li>
-      <li>Ciasno z czasem: najpierw obcinasz ramiona i brzuch, nigdy klatkę i plecy.</li>
-      <li>Dom: przy jednym kettlu progres to więcej powtórzeń w zakresie, potem 5. runda.</li></ul></details>`;
+    <details class="card"><summary>Zasady planu v1.2</summary><ul>
+      <li>Kolejka A → B → C. Nie rób A i C dzień po dniu (dwa razy zawias). Najwyżej 2 dni z rzędu.</li>
+      <li>Siła (slot 1): 4 serie, 1–2 powt. w zapasie, nigdy do upadku.</li>
+      <li>Klatka + plecy: 1 powt. w zapasie, upadek tylko w ostatniej serii. Izolacje mogą iść do upadku.</li>
+      <li>Nogi: po martwym i RDL przód uda, po przysiadzie tył uda. Maszyna zajęta? Przełącz na drugą opcję.</li>
+      <li>Progresja: gdy 1. i 2. seria dojdą do górnej granicy zakresu, dokładasz ciężar.</li>
+      <li>Ciasno z czasem: najpierw brzuch, potem biceps/triceps. Nigdy siła i nogi.</li>
+      <li>Bieg po siłowni jest OK: najpierw siłownia, potem bieżnia. Interwały prowadź po tętnie.</li>
+      <li>Dom: stoper na górze sesji Dom. Wybierz formę i ćwiczenia, Start, a po końcu „Uzupełnij dziennik”.</li></ul></details>`;
   return h;
 }
 function renderBieg(){
@@ -388,12 +411,110 @@ function renderSetup(){return `<section class="card setup"><h2>Połącz z arkusz
   <button class="primary" id="cfg-save">Połącz</button></section>`}
 function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="setup"?renderSetup():tab==="sila"?renderSila():tab==="bieg"?renderBieg():tab==="pomiar"?renderPomiar():renderHist();window.scrollTo(0,y)}
 
+
+// ---------- Home timer (stoper) ----------
+const HOME=[
+ {id:"swing",name:"Swingi",reps:"20 powt.",key:"swing"},
+ {id:"goblet",name:"Goblet squat",reps:"15 powt."},
+ {id:"bulgL",name:"Bułgarskie – lewa",reps:"8–10 powt.",key:"bulg"},
+ {id:"bulgP",name:"Bułgarskie – prawa",reps:"8–10 powt.",key:"bulg"},
+ {id:"row",name:"Wiosłowanie L+P",reps:"10–12 / stronę",key:"krow"},
+ {id:"ohp",name:"Wyciskanie nad głowę L+P",reps:"6–10 / stronę",key:"kohp",opt:"Wyciskanie kettla nad głowę (na stronę)"},
+ {id:"pp",name:"Push press L+P",reps:"6 / stronę",key:"kohp",opt:"Push press (na stronę)"},
+ {id:"push",name:"Pompki",reps:"1–2 przed upadkiem",key:"pomp",opt:"Pompki"},
+ {id:"pushF",name:"Pompki – nogi wyżej",reps:"1–2 przed upadkiem",key:"pomp",opt:"Pompki – nogi wyżej"},
+ {id:"plank",name:"Deska",reps:"do końca interwału"},
+ {id:"abs",name:"Brzuch",reps:"dowolne ćwiczenie"},
+ {id:"rest",name:"Odpoczynek",reps:""}];
+const HB=Object.fromEntries(HOME.map(h=>[h.id,h]));
+const TMODES={emom:{label:"EMOM",work:60,rest:0,rounds:4},tabata:{label:"Tabata",work:20,rest:10,rounds:8},int:{label:"Praca / przerwa",work:40,rest:20,rounds:4}};
+const tdef=()=>({mode:"emom",work:60,rest:0,rounds:4,list:["swing","bulgL","bulgP","row","ohp","push"]});
+let tc=ls.get("timer-cfg",null)||tdef();
+const saveTc=()=>ls.set("timer-cfg",tc);
+const mmss=sec=>{sec=Math.max(0,Math.ceil(sec));return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0")};
+function tSeq(){const q=[];for(let r=0;r<tc.rounds;r++)tc.list.forEach((id,j)=>{const last=r===tc.rounds-1&&j===tc.list.length-1;q.push({k:id==="rest"?"rest":"work",id,dur:tc.work,r});if(tc.rest>0&&!last)q.push({k:"rest",id:"rest",dur:tc.rest,r})});return q}
+function renderTimerCard(){
+  const total=tSeq().reduce((a,x)=>a+x.dur,0);
+  return `<section class="card tm-card"><h2>Stoper</h2>
+   <div class="chips">${Object.entries(TMODES).map(([k,m])=>`<button class="chip" data-tmode="${k}" aria-pressed="${tc.mode===k}">${m.label}</button>`).join("")}</div>
+   <div class="two">${tc.mode==="emom"?stepper("t-work",tc.work,"sek. na ćwiczenie"):stepper("t-work",tc.work,"praca · sek.")}${tc.mode==="emom"?stepper("t-rounds",tc.rounds,"rundy"):stepper("t-rest",tc.rest,"przerwa · sek.")}</div>
+   ${tc.mode==="emom"?"":`<div class="two">${stepper("t-rounds",tc.rounds,"rundy")}<div></div></div>`}
+   <ol class="tm-list">${tc.list.map((id,i)=>`<li><b>${i+1}</b><span>${esc(HB[id].name)} <small>${esc(HB[id].reps)}</small></span>${i?`<button class="mini" data-tup="${i}" aria-label="W górę">↑</button>`:""}<button class="mini" data-tdel="${i}" aria-label="Usuń">✕</button></li>`).join("")||`<li><span class="hint">Dodaj ćwiczenia poniżej</span></li>`}</ol>
+   <div class="chips">${HOME.map(h=>`<button class="chip" data-tadd="${h.id}">+ ${esc(h.name)}</button>`).join("")}</div>
+   <p class="hint num">Runda = ${tc.list.length} × ${tc.work} s${tc.rest?` + przerwy ${tc.rest} s`:""}. Razem ok. <b>${mmss(total)}</b> min.</p>
+   <div class="two"><button class="ghost" id="t-preset">Mój EMOM 24 min</button><button class="primary" id="t-start" ${tc.list.length?"":"disabled"}>▶ Start</button></div></section>`}
+let T=null,actx=null,wake=null;
+function beep(f,ms){try{if(!actx)return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.25,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
+async function lockScreen(){try{if("wakeLock" in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(T&&!T.done&&document.visibilityState==="visible")lockScreen()});
+function tStart(){
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
+  const seq=[{k:"prep",id:tc.list[0],dur:10,r:0},...tSeq()];
+  T={seq,i:0,t0:Date.now(),paused:0,pauseAt:0,last:null,done:false,doneRounds:0,total:seq.slice(1).reduce((a,x)=>a+x.dur,0)};
+  lockScreen();$("#timer").hidden=false;T.h=setInterval(tTick,200);tTick()}
+function tNow(){return T.pauseAt||Date.now()}
+function tTick(){
+  if(!T||T.done)return;
+  let seg=T.seq[T.i],el=(tNow()-T.t0)/1000;
+  while(el>=seg.dur){T.t0+=seg.dur*1000;el-=seg.dur;T.i++;
+    if(T.i>=T.seq.length)return tFinish();
+    seg=T.seq[T.i];beep(seg.k==="work"?880:520,450);try{navigator.vibrate&&navigator.vibrate(seg.k==="work"?[200,80,200]:300)}catch(e){}}
+  const left=seg.dur-el,sec=Math.ceil(left);
+  if(sec<=3&&sec>=1&&T.last!==sec&&!T.pauseAt)beep(660,120);T.last=sec;
+  const nx=T.seq.slice(T.i+1).find(x=>x.k==="work"),ex=HB[seg.id]||{name:"",reps:""};
+  const workIdx=T.seq.slice(0,T.i+1).filter(x=>x.k==="work").length,workAll=T.seq.filter(x=>x.k==="work").length;
+  const doneSec=T.seq.slice(1,T.i).reduce((a,x)=>a+x.dur,0)+(seg.k==="prep"?0:el);
+  const tm=$("#timer");tm.className="timer "+seg.k;
+  tm.innerHTML=`<div><div class="tm-top num"><span>${seg.k==="prep"?"Start za chwilę":`Runda ${seg.r+1}/${tc.rounds} · ${workIdx}/${workAll}`}</span><span>zostało ${mmss(T.total-doneSec)}</span></div>
+    <div class="tm-bar"><i style="width:${Math.min(100,doneSec/T.total*100).toFixed(1)}%"></i></div></div>
+    <div class="tm-mid"><div class="tm-phase">${seg.k==="prep"?"Przygotuj się":seg.k==="rest"?"Przerwa":T.pauseAt?"Pauza":"Praca"}</div>
+    <div class="tm-ex">${seg.k==="prep"?esc(ex.name):seg.k==="rest"?"Odpoczynek":esc(ex.name)}</div>
+    <div class="tm-reps">${seg.k==="work"?esc(ex.reps):seg.k==="prep"?esc(ex.reps):"&nbsp;"}</div>
+    <div class="tm-clock num">${mmss(left)}</div>
+    <div class="tm-next">${nx?`Następne: <b>${esc(HB[nx.id].name)}</b>`:"Ostatnie!"}</div></div>
+    <div class="tm-btns"><button id="t-pause">${T.pauseAt?"Wznów":"Pauza"}</button><button id="t-skip">Dalej ⏭</button><button id="t-stop">Koniec</button></div>`}
+function tFinish(early){
+  clearInterval(T.h);T.done=true;try{wake&&wake.release()}catch(e){}wake=null;
+  const segs=T.seq.slice(1,T.i+(early?0:1)).filter(x=>x.k==="work");
+  T.doneRounds=early?Math.floor(segs.length/tc.list.length):tc.rounds;
+  if(!early){beep(988,700);try{navigator.vibrate&&navigator.vibrate([300,100,300,100,300])}catch(e){}}
+  $("#timer").className="timer";
+  $("#timer").innerHTML=`<div></div><div class="tm-mid"><div class="tm-phase">${early?"Przerwane":"Koniec"}</div><div class="tm-ex">${early?"Zrobione rundy: "+T.doneRounds:"Dobra robota"}</div>
+    <div class="tm-reps">${T.doneRounds?"Mogę odhaczyć "+T.doneRounds+" rund w dzienniku. Sprawdź powtórzenia przed zapisem.":"Brak pełnych rund do odhaczenia."}</div></div>
+    <div class="two">${T.doneRounds?`<button class="primary" id="t-fill">Uzupełnij dziennik</button>`:"<div></div>"}<button class="ghost" id="t-close">Zamknij</button></div>`}
+function tFill(){
+  if(!draft||draft.type!=="Dom"){draft=newDraft("Dom",false);}
+  const keys=new Set();
+  for(const id of tc.list){const h=HB[id];if(!h.key||keys.has(h.key))continue;keys.add(h.key);const it=draft.items[h.key];if(!it)continue;
+    if(h.opt)it.ex=h.opt; it.skip=false;
+    for(let r=0;r<T.doneRounds;r++){if(r>=it.sets.length){it.plus=(it.plus||0)+1;it.sets.push(null)}it.sets[r]=it.r}}
+  for(const s of plan("Dom"))for(const ex of s.ex)if(!keys.has(ex.key)&&draft.items[ex.key]&&!draft.items[ex.key].sets.some(x=>x!=null))draft.items[ex.key].skip=true;
+  const extra=[...new Set(tc.list.filter(id=>!HB[id].key&&id!=="rest"))];
+  draft.extras=draft.extras||[];
+  for(const id of extra)draft.extras.push({ex:HB[id].name+(id==="plank"?" (sek.)":""),w:id==="goblet"?20:0,r:id==="plank"?tc.work:id==="goblet"?15:12,sets:Array(T.doneRounds).fill(id==="plank"?tc.work:id==="goblet"?15:12),plus:Math.max(0,T.doneRounds-3)});
+  delete draft.auto;saveDraft();tClose();toast("Odhaczone. Popraw liczby, jeśli trzeba, i zapisz trening.")}
+function tClose(){if(T&&T.h)clearInterval(T.h);try{wake&&wake.release()}catch(e){}wake=null;T=null;$("#timer").hidden=true;render()}
+function timerClick(b){
+  if(b.dataset.tmode){const m=TMODES[b.dataset.tmode];tc.mode=b.dataset.tmode;tc.work=m.work;tc.rest=m.rest;tc.rounds=m.rounds;saveTc();render();return true}
+  if(b.dataset.tadd){tc.list.push(b.dataset.tadd);saveTc();render();return true}
+  if(b.dataset.tdel){tc.list.splice(+b.dataset.tdel,1);saveTc();render();return true}
+  if(b.dataset.tup){const i=+b.dataset.tup;[tc.list[i-1],tc.list[i]]=[tc.list[i],tc.list[i-1]];saveTc();render();return true}
+  if(b.id==="t-preset"){tc=tdef();saveTc();render();return true}
+  if(b.id==="t-start"){tStart();return true}
+  if(b.id==="t-pause"){if(T.pauseAt){T.t0+=Date.now()-T.pauseAt;T.pauseAt=0}else T.pauseAt=Date.now();tTick();return true}
+  if(b.id==="t-skip"){const seg=T.seq[T.i];T.t0=tNow()-seg.dur*1000;tTick();return true}
+  if(b.id==="t-stop"){tFinish(true);return true}
+  if(b.id==="t-fill"){tFill();return true}
+  if(b.id==="t-close"){tClose();return true}
+  return false}
+
 // ---------- Events ----------
 function findEx(key){if(key[0]==="x")return XEX;for(const s of plan(draft.type)) for(const ex of s.ex) if(ex.key===key) return ex}
 function itemOf(key){return key[0]==="x"?draft.extras[+key.slice(1)]:draft.items[key]}
 const bf=()=>ls.get("bieg-form",{t:"Spokojny",km:8,min:48});
 const pf=()=>{const lastM=entries.find(e=>e.kind==="pomiar");return ls.get("pom-form",{kg:lastM?lastM.kg:80.6,waist:lastM?lastM.waist:84})};
 function bump(id,dir){
+  if(id.startsWith("t-")){const f=id.slice(2),st=f==="rounds"?1:f==="work"&&tc.mode==="emom"?15:5;tc[f]=Math.max(f==="rest"?0:1,(tc[f]||0)+dir*st);saveTc();render();return}
   if(tab==="sila"){const [kind,key]=id.split("-"),ex=findEx(key),it=itemOf(key);
     if(kind==="w")it.w=Math.max(0,Math.round(((it.w||0)+dir*ex.step)*10)/10); else it.r=Math.max(1,(it.r||0)+dir*(repUnit(it.ex)==="sek."?5:1)); saveDraft()}
   else if(tab==="bieg"){const b=bf(); if(id==="km")b.km=Math.max(0,Math.round(((b.km||0)+dir*0.5)*10)/10); else b.min=Math.max(0,(b.min||0)+dir); ls.set("bieg-form",b)}
@@ -402,6 +523,7 @@ function bump(id,dir){
 }
 document.addEventListener("click",async ev=>{
   const b=ev.target.closest("button"); if(!b) return;
+  if(timerClick(b)) return;
   if(b.id==="open-setup"){tab="setup";render();return}
   if(b.id==="cfg-save"){const u=$("#cfg-url").value.trim(),k=$("#cfg-key").value.trim(); if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){toast("Adres musi zaczynać się od https://script.google.com i kończyć na /exec");return}
     b.disabled=true;b.textContent="Sprawdzam…";
@@ -437,6 +559,7 @@ document.addEventListener("change",ev=>{
   const el=ev.target; if(el.tagName!=="INPUT") return;
   if(el.dataset.nameFor){const k=el.dataset.nameFor,it=itemOf(k),name=el.value.trim(); if(name){it.ex=name; const last=lastFor(name); if(last) it.w=last.w; it.other=false} saveDraft(); render(); return}
   const v=parse(el.value);
+  if(el.id.startsWith("t-")){const f=el.id.slice(2);if(v!=null)tc[f]=Math.max(f==="rest"?0:1,Math.round(v));saveTc();render();return}
   if(tab==="sila"){const [kind,key]=el.id.split("-"),it=itemOf(key); if(v!=null){ if(kind==="w")it.w=Math.max(0,v); else it.r=Math.max(1,Math.round(v)); saveDraft() }}
   else if(tab==="bieg"){const b=bf(); if(v!=null) b[el.id]=v; ls.set("bieg-form",b)}
   else if(tab==="pomiar"){const f=pf(); f[el.id]=v; ls.set("pom-form",f)}
