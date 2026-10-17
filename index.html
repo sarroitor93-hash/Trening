@@ -152,12 +152,9 @@ const BIC=["Uginanie – hantle","Uginanie – sztanga","Uginanie – linka"];
 const TRI=["Prostowanie linką w dół","Prostowanie linką nad głową","Prostowanie jednorącz"];
 const BW=["Podciąganie","Pompki","Pompki – nogi wyżej","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)"];
 const ALL=[...new Set(["Martwy ciąg","RDL","Przysiad hack","Suwnica","Przysiad ze sztangą",...KLATKA,...PLECY,...NOGI,...BOKI,...BIC,...TRI,...ABS,"Wznosy na łydki","Odwrotne rozpiętki","Face pull","Hip thrust","Wykroki","Dipy"])];
-function arms(c){return {id:"ramiona",title:"4 · Ramiona + łydki"+(c?" + tył barków":" + brzuch"),rule:"czwórka w kółko · do upadku · ok. 1,5 min",min:false,
+function arms(){return {id:"ramiona",title:"5 · Biceps + triceps",rule:"superseria · do upadku · ok. 1,5 min",min:false,
      ex:[{key:"biceps",label:"Biceps",opts:BIC,def:0,sets:2,lo:10,hi:15,unit:"kg",step:1},
-         {key:"triceps",label:"Triceps",opts:TRI,def:1,sets:2,lo:10,hi:15,unit:"kg",step:2.5},
-         {key:"lydki",label:"Łydki · pauza w dolnym rozciągnięciu",opts:LYDKI,def:0,sets:2,lo:10,hi:15,unit:"kg",step:5},
-         c?{key:"tyl",label:"Tył barków",opts:TYL,def:0,sets:2,lo:12,hi:20,unit:"kg",step:1}
-          :{key:"brzuch",label:"Brzuch",opts:ABS,def:0,sets:2,lo:10,hi:20,unit:"kg",step:2.5,noProg:true}]}}
+         {key:"triceps",label:"Triceps",opts:TRI,def:1,sets:2,lo:10,hi:15,unit:"kg",step:2.5}]}}
 function plan(type){
   if(type==="Dom") return [
     {id:"dom",title:"Dom · EMOM 24 min",rule:"4 rundy × 6 min · reszta minuty = odpoczynek",
@@ -178,11 +175,14 @@ function plan(type){
     {id:"gora",title:"2 · Klatka + plecy",rule:"superseria · 1 RIR, upadek tylko w ostatniej serii · 2,5–3 min",min:true,
      ex:[{key:"klatka",label:"Klatka",opts:KLATKA,def:A?0:C?1:2,sets:up,lo:6,hi:10,unit:"kg",step:2.5},
          {key:"plecy",label:"Plecy",opts:PLECY,def:A?0:C?2:1,sets:up,lo:6,hi:10,unit:"kg",step:2.5}]},
-    {id:"nogi",title:"3 · Uda + boki barków",rule:"trójseria · do upadku · boki 3. seria solo",min:false,
+    {id:"tyluda",title:"3 · Tył uda + boki barków",rule:"superseria · do upadku · 3. seria boków solo",min:false,
      ex:[{key:"ugin",label:"Tył uda",opts:UGIN,def:0,sets:2,lo:8,hi:12,unit:"kg",step:2.5},
-         {key:"prost",label:"Przód uda",opts:PROST,def:0,sets:2,lo:8,hi:12,unit:"kg",step:2.5},
          {key:"barki",label:"Boki barków",opts:BOKI,def:A?0:C?2:1,sets:3,lo:10,hi:20,unit:"kg",step:1}]},
-    arms(C)
+    {id:"przoduda",title:C?"4 · Przód uda + tył barków":"4 · Przód uda + brzuch",rule:"superseria · do upadku",min:false,
+     ex:[{key:"prost",label:"Przód uda",opts:PROST,def:0,sets:2,lo:8,hi:12,unit:"kg",step:2.5},
+         C?{key:"tyl",label:"Tył barków",opts:TYL,def:1,sets:2,lo:12,hi:20,unit:"kg",step:1}
+          :{key:"brzuch",label:"Brzuch",opts:ABS,def:0,sets:2,lo:10,hi:20,unit:"kg",step:2.5,noProg:true}]},
+    arms()
   ];
 }
 const START={"Martwy ciąg":110,"Brzuszki na maszynie":20,"Spięcia na linie":20,"Deska (sek.)":0,"Tabata brzuch (rundy)":0,"Wyciskanie hantli – skos":27.5,"Suwnica":150,"Podciąganie":0,"Wskok na skrzynię":60,"Skok w dal":220,"RDL":80,"Prostowanie nóg (maszyna)":50,"Uginanie nóg siedząc (maszyna)":40,
