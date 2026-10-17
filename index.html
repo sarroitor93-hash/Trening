@@ -199,7 +199,7 @@ function plan(type){
     :C?{key:"silaC",label:"Zawias / nogi",opts:["RDL","Suwnica","Przysiad hack"],def:0,sets:4,lo:6,hi:10,unit:"kg",step:2.5}
     :{key:"silaB",label:"Przysiad",opts:["Przysiad hack","Suwnica","Przysiad ze sztangą"],def:0,sets:4,lo:5,hi:6,unit:"kg",step:2.5};
   return [
-    {id:"skoki",rest:90,title:"0 · Skoki",rule:"maks. wysokość · zejście krokiem · pełny odpoczynek 60–90 s",nofail:true,min:false,
+    {id:"skoki",rest:60,title:"0 · Skoki",rule:"maks. wysokość · zejście krokiem · odpoczynek 1 min",nofail:true,min:false,
      ex:[{key:"skoki",label:"Moc",opts:["Wskok na skrzynię","Skok w dal"],def:0,sets:3,lo:3,hi:3,unit:"cm",step:5,noProg:true}]},
     {id:"sila",rest:180,title:"1 · Siła",rule:"RIR 1–2 · nie do upadku",nofail:true,min:true,ex:[sila]},
     {id:"gora",rest:150,title:"2 · Klatka + plecy",rule:"superseria · 1 RIR, upadek tylko w ostatniej serii",min:true,
