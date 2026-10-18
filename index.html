@@ -395,7 +395,7 @@ function renderPomiar(){
     <div class="meta num"><span>${lastM?"Ost.: "+fmt(lastM.kg)+" kg"+(lastM.waist?" · "+fmt(lastM.waist)+" cm":""):"Brak pomiarów"}</span></div>
     <button class="primary" id="save-pom">Zapisz pomiar</button></section>`;
 }
-let armed=null;
+let armed=null,savingNow=false;
 function renderHist(){
   const now=Date.now(),d7=now-7*864e5,d28=now-28*864e5,t=e=>new Date(e.date).getTime();
   const s7=strength().filter(e=>t(e)>=d7).length,s28=strength().filter(e=>t(e)>=d28).length,r28=entries.filter(e=>e.kind==="bieg"&&t(e)>=d28).length;
@@ -584,12 +584,13 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.set){const it=itemOf(b.dataset.set),i=+b.dataset.i; if(it.sets[i]!=null)it.sets[i]=null; else {it.sets[i]=it.r;const sl=slotOf(b.dataset.set);if(draft.type!=="Dom")startRest(sl?restFor(sl):90)} delete draft.auto; saveDraft(); render(); return}
   if(b.id==="reset"){draft=newDraft(nextType(),false);draft.auto=true;saveDraft();render();return}
   if(b.id==="save"){
-    b.disabled=true; b.textContent="Zapisuję…";
+    if(savingNow) return; savingNow=true; b.disabled=true; b.textContent="Zapisuję…";
     const items=allItems().filter(([k,it])=>it.sets.some(x=>x!=null)).map(([k,it])=>({key:k,ex:it.ex,w:it.w,sets:it.sets}));
-    try{await addEntry({kind:"sila",type:draft.type,minimum:draft.type!=="Dom"&&draft.minimum,items}); toast("Zapisano w arkuszu · "+items.length+" ćw.")}
-    catch(e){toast("Brak zasięgu · zapisane w telefonie, wyślę automatycznie")}
+    const entry={kind:"sila",type:draft.type,minimum:draft.type!=="Dom"&&draft.minimum,items};
     ls.del("draft"); draft=null; stopRest();
-    render(); return}
+    try{await addEntry(entry); toast("Zapisano w arkuszu · "+items.length+" ćw.")}
+    catch(e){toast("Brak zasięgu · zapisane w telefonie, wyślę automatycznie")}
+    savingNow=false; render(); return}
   if(b.dataset.run){const f=bf(); f.t=b.dataset.run; if(f.t==="Test 5 km")f.km=5; ls.set("bieg-form",f); render(); return}
   if(b.id==="save-run"){const f=bf(); b.disabled=true; try{await addEntry({kind:"bieg",runType:f.t,km:f.km,min:f.min}); toast("Zapisano bieg w arkuszu")}catch(e){toast("Brak zasięgu · bieg czeka w kolejce")} render(); return}
   if(b.id==="save-pom"){const f=pf(); b.disabled=true; try{await addEntry({kind:"pomiar",kg:f.kg,waist:f.waist}); toast("Zapisano pomiar w arkuszu")}catch(e){toast("Brak zasięgu · pomiar czeka w kolejce")} render(); return}
