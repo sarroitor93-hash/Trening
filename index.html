@@ -33,6 +33,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 header{position:sticky;top:0;z-index:5;background:var(--bg);padding-block:12px 8px;display:grid;gap:10px}
 .brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.02em;margin:0;text-transform:uppercase}
+.brand-r{display:flex;align-items:center;gap:10px}
+.gear{border:0;background:var(--surface-2);border-radius:999px;width:38px;height:38px;font-size:20px;line-height:1;color:var(--fg)}
 .sync{font-size:12px;color:var(--muted)}
 .sync.err{color:var(--danger)}
 .setup{display:grid;gap:12px}
@@ -148,7 +150,7 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 <body>
 <div class="wrap">
 <header>
-  <div class="brand"><h1>Trening</h1><span class="sync" id="sync">Wczytuję arkusz…</span></div>
+  <div class="brand"><h1>Trening</h1><span class="brand-r"><span class="sync" id="sync">Wczytuję arkusz…</span><button class="gear" id="open-settings" aria-label="Ustawienia">⚙</button></span></div>
   <nav class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="sila">Trening</button>
     <button role="tab" aria-selected="false" data-tab="bieg">Bieg</button>
@@ -331,7 +333,7 @@ $("#rest-p").addEventListener("click",()=>{restDur+=15;restBeeped=false;drawRest
 function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2400)}
 
 // ---------- Rendering ----------
-let tab="sila";
+let tab="sila",prevTab="sila";
 document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{tab=b.dataset.tab;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));render()}));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function stepper(id,val,unit){return `<div><div class="stepper"><button data-dec="${id}" aria-label="mniej">−</button><input id="${id}" class="num" inputmode="decimal" value="${val==null?"":fmt(val)}" placeholder="—"><button data-inc="${id}" aria-label="więcej">+</button></div><span class="unit">${unit}</span></div>`}
@@ -446,19 +448,22 @@ function renderHist(){
     else{badge=`<span class="badge">Pomiar</span>`;body=`<ul><li>${fmt(e.kg)} kg${e.waist?" · talia "+fmt(e.waist)+" cm":""}</li></ul>`}
     h+=`<div class="entry"><div class="entry-h"><span>${badge}</span><span class="num" style="font-size:13px;color:var(--muted)">${dt} ${armed===e.id?`<span class="confirm">Usunąć? <button class="del arm" data-del="${esc(e.id)}">Tak, usuń</button><button class="del" data-cancel="1">Nie</button></span>`:`<button class="del" data-del="${esc(e.id)}">Usuń</button>`}</span></div>${body}</div>`;
   }
-  h+=`</section><section class="card"><h2>Ustawienia</h2>
+  h+=`</section>`;
+  return h;
+}
+function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
     <span class="ex-label">Dźwięk (przerwy i stoper)</span>
     <div class="chips">${[["off","Wyłączony"],["cicho","Cichy"],["glosno","Głośny"]].map(([k,l])=>`<button class="chip" data-snd="${k}" aria-pressed="${prefs.snd===k}">${l}</button>`).join("")}</div>
     <span class="ex-label">Wibracje</span>
-    <div class="chips"><button class="chip" id="vib" aria-pressed="${prefs.vib}">${prefs.vib?"Włączone":"Wyłączone"}</button></div></section>`;
-  return h+`<button class="ghost" id="open-setup">Ustawienia połączenia</button>`;
-}
+    <div class="chips"><button class="chip" id="vib" aria-pressed="${prefs.vib}">${prefs.vib?"Włączone":"Wyłączone"}</button></div></section>
+  <button class="ghost" id="open-setup">Połączenie z arkuszem</button>
+  <button class="primary" id="close-settings">Gotowe</button>`}
 function renderSetup(){return `<section class="card setup"><h2>Połącz z arkuszem</h2>
   <p class="hint">Jednorazowo. Wklej adres skryptu Google (kończy się na /exec). Klucz dostępu jest już wpisany, jeśli otworzyłeś link od trenera.</p>
   <label for="cfg-url">Adres skryptu</label><input id="cfg-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url)}">
   <label for="cfg-key">Klucz dostępu</label><input id="cfg-key" placeholder="klucz" value="${esc(cfg.key)}">
   <button class="primary" id="cfg-save">Połącz</button></section>`}
-function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="setup"?renderSetup():tab==="sila"?renderSila():tab==="bieg"?renderBieg():tab==="pomiar"?renderPomiar():renderHist();window.scrollTo(0,y)}
+function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="setup"?renderSetup():tab==="settings"?renderSettings():tab==="sila"?renderSila():tab==="bieg"?renderBieg():tab==="pomiar"?renderPomiar():renderHist();window.scrollTo(0,y)}
 
 
 // ---------- Home timer (stoper) ----------
@@ -598,6 +603,8 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.rdec||b.dataset.rinc){const id=b.dataset.rdec||b.dataset.rinc,sl=plan(draft.type).find(x=>x.id===id);restCfg[id]=Math.max(15,restFor(sl)+(b.dataset.rinc?15:-15));ls.set("rest-cfg",restCfg);render();return}
   if(b.dataset.rgo){const sl=plan(draft.type).find(x=>x.id===b.dataset.rgo);startRest(restFor(sl));return}
   if(b.id==="open-setup"){tab="setup";render();return}
+  if(b.id==="open-settings"){prevTab=tab==="settings"?prevTab:tab;tab="settings";document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected","false"));render();return}
+  if(b.id==="close-settings"){tab=prevTab||"sila";document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===tab));render();return}
   if(b.id==="cfg-save"){const u=$("#cfg-url").value.trim(),k=$("#cfg-key").value.trim(); if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){toast("Adres musi zaczynać się od https://script.google.com i kończyć na /exec");return}
     b.disabled=true;b.textContent="Sprawdzam…";
     try{const r=await fetch(u+"?action=data&key="+encodeURIComponent(k));const j=await r.json();if(!j.ok)throw new Error(j.error);cfg={url:u,key:k};ls.set("cfg",cfg);tab="sila";toast("Połączono z arkuszem");load()}
