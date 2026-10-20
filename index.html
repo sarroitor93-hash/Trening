@@ -115,6 +115,7 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 .rest .t{font-family:var(--display);font-weight:700;font-size:28px}
 .rest.over{background:var(--done-bg);border-top-color:var(--done)}
 .rest.over .t{color:var(--done)}
+.rest.over #rest-x{background:var(--done);color:#fff;border-color:var(--done)}
 .rest-b{display:flex;gap:6px}
 .rest-b .ghost{padding:8px 10px}
 .restctl{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
@@ -160,7 +161,7 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 </header>
 <main id="main"></main>
 </div>
-<div class="rest" id="rest" hidden><div><div class="l" id="rest-l">Przerwa</div><div class="t num" id="rest-t">0:00</div></div><div class="rest-b"><button class="ghost" id="rest-m">−15 s</button><button class="ghost" id="rest-p">+15 s</button><button class="ghost" id="rest-x">Stop</button></div></div>
+<div class="rest" id="rest" hidden><div><div class="l" id="rest-l">Przerwa</div><div class="t num" id="rest-t">0:00</div></div><div class="rest-b"><button class="ghost" id="rest-m">−15 s</button><button class="ghost" id="rest-p">+15 s</button><button class="ghost" id="rest-x"><b>Stop</b></button></div></div>
 <div class="toast" id="toast" hidden></div>
 <div class="timer" id="timer" hidden></div>
 
@@ -318,13 +319,13 @@ const restFor=sl=>restCfg[sl.id]!=null?restCfg[sl.id]:(sl.rest||90);
 function roundDone(sl,i){if(!sl)return true;return sl.ex.every(ex=>{const it=draft.items[ex.key];if(!it||it.skip)return true;const n=setsFor(ex)+(it.plus||0);return i>=n||it.sets[i]!=null})}
 function slotOf(key){if(!draft||key[0]==="x")return null;for(const sl of plan(draft.type))if(sl.ex.some(e=>e.key===key))return sl;return null}
 function startRest(sec){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
-  restAt=Date.now();restDur=sec||90;restBeeped=false;$("#rest").hidden=false;if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
+  restAt=Date.now();restDur=sec||90;restBeeped=false;drawRest.over=null;$("#rest").hidden=false;if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
 function stopRest(){restAt=null;$("#rest").hidden=true;clearInterval(restTick);restTick=null;$("#rest").classList.remove("over")}
 function drawRest(){if(!restAt)return;const left=restDur-(Date.now()-restAt)/1000,el=$("#rest");
   if(left<=3&&left>0&&Math.ceil(left)!==drawRest.last){drawRest.last=Math.ceil(left);beep(660,110)}
-  if(left<=0&&!restBeeped){restBeeped=true;beep(880,600);vib([250,100,250])}
+  if(left<=0){const over=Math.floor(-left);if(drawRest.over!==over&&over<300){drawRest.over=over;beep(880,220);vib(220)}}else drawRest.over=null;
   el.classList.toggle("over",left<=0);
-  $("#rest-l").textContent=left>0?"Przerwa":"Czas na serię";
+  $("#rest-l").textContent=left>0?"Przerwa":"Czas na serię · Stop wycisza";
   $("#rest-t").textContent=(left>0?"":"+")+mmssR(Math.abs(left))}
 function mmssR(x){x=Math.max(0,Math.ceil(x));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
 $("#rest-x").addEventListener("click",stopRest);
@@ -624,7 +625,7 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.snd){prefs.snd=b.dataset.snd;savePrefs();try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}beep(880,250);render();return}
   if(b.id==="vib"){prefs.vib=!prefs.vib;savePrefs();vib(200);render();return}
   if(b.id==="add-ex"){draft.extras.push({ex:"",w:0,r:XEX.hi,sets:Array(XEX.sets).fill(null)}); saveDraft(); render(); const els=document.querySelectorAll("[data-name-for^='x']"); if(els.length) els[els.length-1].focus(); return}
-  if(b.dataset.set){const it=itemOf(b.dataset.set),i=+b.dataset.i; if(it.sets[i]!=null){it.sets[i]=null;if(it.ws)it.ws[i]=null} else {it.sets[i]=it.r;it.ws=it.ws||[];it.ws[i]=it.w;if(!draft.start)draft.start=Date.now();const sl=slotOf(b.dataset.set);if(draft.type!=="Dom"&&roundDone(sl,i))startRest(sl?restFor(sl):90)} delete draft.auto; saveDraft(); render(); return}
+  if(b.dataset.set){const it=itemOf(b.dataset.set),i=+b.dataset.i; if(it.sets[i]!=null){it.sets[i]=null;if(it.ws)it.ws[i]=null} else {if(restAt&&restDur-(Date.now()-restAt)/1000<=0)stopRest();it.sets[i]=it.r;it.ws=it.ws||[];it.ws[i]=it.w;if(!draft.start)draft.start=Date.now();const sl=slotOf(b.dataset.set);if(draft.type!=="Dom"&&roundDone(sl,i))startRest(sl?restFor(sl):90)} delete draft.auto; saveDraft(); render(); return}
   if(b.id==="reset"){draft=newDraft(nextType(),false);draft.auto=true;saveDraft();render();return}
   if(b.id==="save"){
     if(savingNow) return; savingNow=true; b.disabled=true; b.textContent="Zapisuję…";
