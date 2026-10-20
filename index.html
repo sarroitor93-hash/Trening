@@ -269,7 +269,21 @@ async function load(){
     const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json();
     if(!j.ok) throw new Error(j.error);
     const list=build(j.data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
+    oneTimeFixes(list);
   }catch(e){ setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
+}
+// Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
+async function oneTimeFixes(list){
+  const FIX="fix-20-10-nogi-barki"; if(ls.get(FIX,false)) return;
+  const e=list.find(x=>x.id==="smvgqcd96gzip"); if(!e){ls.set(FIX,true);return}
+  const n=e.items.find(i=>i.key==="nogi"),b=e.items.find(i=>i.key==="barki");
+  if(!n||!b||n.sets.length>=3){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id;
+  for(const it of fixed.items){
+    if(it.key==="nogi"){it.ex="Uginanie nóg leżąc (maszyna)";it.sets=[8,8,8]}
+    if(it.key==="barki"){it.sets=[14,14,14]}
+  }
+  try{await removeEntry(e.id); await addEntry(fixed); ls.set(FIX,true); toast("Poprawiłem trening z 20.10: uginanie leżąc 3×8, odwodzenie 3×14")}catch(err){}
 }
 async function addEntry(e){
   e.date=e.date||new Date().toISOString(); e.id="s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
