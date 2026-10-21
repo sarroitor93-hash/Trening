@@ -242,7 +242,7 @@ function build(d){
     if(r[17]!==""&&r[17]!=null)it.note=String(r[17]);
     e.items.push(it);
   }
-  for(const r of d.run||[]) out.push({id:String(r[5]),kind:"bieg",date:r[0],runType:String(r[1]),km:Number(r[2])||0,min:Number(r[3])||0});
+  for(const r of d.run||[]) out.push({id:String(r[5]),kind:"bieg",date:r[0],runType:String(r[1]),km:Number(r[2])||0,min:Number(r[3])||0,hr:nz(r[6])});
   for(const r of d.meas||[]) out.push({id:String(r[3]),kind:"pomiar",date:r[0],kg:Number(r[1])||0,waist:nz(r[2])});
   return out;
 }
@@ -437,7 +437,8 @@ function renderBieg(){
     <div class="chips">${types.map(t=>`<button class="chip" data-run="${t}" aria-pressed="${t===b.t}">${t}</button>`).join("")}</div>
     <p class="hint">${b.t==="Interwały 4×4"?"4 × 4 min mocno (ok. 90–95% HRmax), 3 min truchtu między.":b.t==="Spokojny"?"45–60 min w tempie rozmowy pełnymi zdaniami.":"5 km na czas. Punkt odniesienia dla VO2max."}</p>
     <div class="two">${stepper("km",b.km,"km")}${stepper("min",b.min,"minuty")}</div>
-    <div class="meta num"><span>Tempo: <b>${paceTxt}</b></span><span>${last?"Ost.: "+esc(last.runType)+" · "+fmt(last.km)+" km":""}</span></div>
+    <div class="two">${stepper("hr",b.hr,"śr. tętno · bpm")}<div></div></div>
+    <div class="meta num"><span>Tempo: <b>${paceTxt}</b></span><span>${last?"Ost.: "+esc(last.runType)+" · "+fmt(last.km)+" km"+(last.hr?" · "+last.hr+" bpm":""):""}</span></div>
     <button class="primary" id="save-run">Zapisz bieg</button></section>`;
 }
 function renderPomiar(){
@@ -470,7 +471,7 @@ function renderHist(){
     const dd=new Date(e.date),dt=dd.toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})+", "+dd.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"});
     let body="",badge="";
     if(e.kind==="sila"){badge=`<span class="badge">${esc(e.type)}</span>${e.minimum?"minimum":""}`;body=`<ul>${(e.items||[]).filter(i=>i.mode==="time"||(i.sets||[]).some(x=>x!=null)).map(i=>`<li>${esc(i.ex)}: ${i.mode==="time"?fmt(i.min||0)+" min":(i.ws&&i.ws.filter(x=>x!=null).length>1?i.ws.filter(x=>x!=null).map(fmt).join("/"):fmt(i.w))+" × "+(i.sets||[]).filter(x=>x!=null).join("/")}${i.note?" · <i>"+esc(i.note)+"</i>":""}</li>`).join("")}${e.durMin?`<li>Czas: ${e.durMin} min</li>`:""}${e.note?`<li><i>${esc(e.note)}</i></li>`:""}</ul>`}
-    else if(e.kind==="bieg"){badge=`<span class="badge">Bieg</span>${esc(e.runType)}`;body=`<ul><li>${fmt(e.km)} km · ${fmt(e.min)} min</li></ul>`}
+    else if(e.kind==="bieg"){badge=`<span class="badge">Bieg</span>${esc(e.runType)}`;body=`<ul><li>${fmt(e.km)} km · ${fmt(e.min)} min${e.hr?" · "+e.hr+" bpm":""}</li></ul>`}
     else{badge=`<span class="badge">Pomiar</span>`;body=`<ul><li>${fmt(e.kg)} kg${e.waist?" · talia "+fmt(e.waist)+" cm":""}</li></ul>`}
     h+=`<div class="entry"><div class="entry-h"><span>${badge}</span><span class="num" style="font-size:13px;color:var(--muted)">${dt} ${armed===e.id?`<span class="confirm">Usunąć? <button class="del arm" data-del="${esc(e.id)}">Tak, usuń</button><button class="del" data-cancel="1">Nie</button></span>`:`${e.kind==="sila"?`<button class="del" data-edit="${esc(e.id)}">Edytuj</button>`:""}<button class="del" data-del="${esc(e.id)}">Usuń</button>`}</span></div>${body}</div>`;
   }
@@ -619,7 +620,7 @@ function bump(id,dir){
   if(tab==="sila"&&id.startsWith("m-")){const it=itemOf(id.slice(2));it.min=Math.max(0,(it.min||0)+dir);saveDraft();render();return}
   if(tab==="sila"){const [kind,key]=id.split("-"),ex=findEx(key),it=itemOf(key);
     if(kind==="w")it.w=Math.max(0,Math.round(((it.w||0)+dir*ex.step)*10)/10); else it.r=Math.max(1,(it.r||0)+dir*(repUnit(it.ex)==="sek."?5:1)); saveDraft()}
-  else if(tab==="bieg"){const b=bf(); if(id==="km")b.km=Math.max(0,Math.round(((b.km||0)+dir*0.5)*10)/10); else b.min=Math.max(0,(b.min||0)+dir); ls.set("bieg-form",b)}
+  else if(tab==="bieg"){const b=bf(); if(id==="km")b.km=Math.max(0,Math.round(((b.km||0)+dir*0.5)*10)/10); else if(id==="hr")b.hr=Math.max(0,(b.hr||140)+dir); else b.min=Math.max(0,(b.min||0)+dir); ls.set("bieg-form",b)}
   else if(tab==="pomiar"){const f=pf(); if(id==="kg")f.kg=Math.round(((f.kg||80)+dir*0.1)*10)/10; else f.waist=f.waist==null?84:Math.round((f.waist+dir*0.5)*10)/10; ls.set("pom-form",f)}
   render();
 }
@@ -663,7 +664,7 @@ document.addEventListener("click",async ev=>{
     catch(e){toast("Brak zasięgu · zapisane w telefonie, wyślę automatycznie")}
     savingNow=false; render(); return}
   if(b.dataset.run){const f=bf(); f.t=b.dataset.run; if(f.t==="Test 5 km")f.km=5; ls.set("bieg-form",f); render(); return}
-  if(b.id==="save-run"){const f=bf(); b.disabled=true; try{await addEntry({kind:"bieg",runType:f.t,km:f.km,min:f.min}); toast("Zapisano bieg w arkuszu")}catch(e){toast("Brak zasięgu · bieg czeka w kolejce")} render(); return}
+  if(b.id==="save-run"){const f=bf(); b.disabled=true; try{await addEntry({kind:"bieg",runType:f.t,km:f.km,min:f.min,hr:f.hr||null}); toast("Zapisano bieg w arkuszu")}catch(e){toast("Brak zasięgu · bieg czeka w kolejce")} render(); return}
   if(b.id==="save-pom"){const f=pf(); b.disabled=true; try{await addEntry({kind:"pomiar",kg:f.kg,waist:f.waist}); toast("Zapisano pomiar w arkuszu")}catch(e){toast("Brak zasięgu · pomiar czeka w kolejce")} render(); return}
   if(b.dataset.edit){const e=entries.find(x=>x.id===b.dataset.edit);if(!e)return;if(draftHasSets()&&!draft.editId){toast("Masz niezapisany trening. Zapisz albo wyczyść go najpierw.");return}
     draft=draftFromEntry(e);saveDraft();tab="sila";document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab==="sila"));render();window.scrollTo(0,0);toast("Edytujesz zapisany trening. Popraw i kliknij Zapisz zmiany.");return}
