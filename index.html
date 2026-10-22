@@ -455,14 +455,27 @@ function renderBieg(){
     <div class="meta num"><span>Tempo: <b>${paceTxt}</b></span><span>${last?"Ost.: "+esc(last.runType)+" · "+fmt(last.km)+" km"+(last.hr?" · "+last.hr+" bpm":""):""}</span></div>
     <button class="primary" id="save-run">Zapisz bieg</button></section>`;
 }
+function weekStats(){
+  const ms=entries.filter(e=>e.kind==="pomiar"&&e.kg>0),day=d=>new Date(d).toDateString(),now=Date.now();
+  const byDay={};for(const e of ms.slice().reverse())byDay[day(e.date)]=e;
+  const daily=Object.values(byDay),t=e=>new Date(e.date).getTime();
+  const avg=(a,b)=>{const x=daily.filter(e=>now-t(e)>=a*864e5&&now-t(e)<b*864e5);return x.length?{v:x.reduce((s,e)=>s+e.kg,0)/x.length,n:x.length}:null};
+  const w1=avg(0,7),w2=avg(7,14),wa=ms.filter(e=>e.waist).slice(0,2);
+  if(!w1&&!wa.length)return "";
+  const d=w1&&w2?w1.v-w2.v:null;
+  return `<section class="card"><h2>Trend</h2><div class="stats num">
+    <div class="stat"><b>${w1?fmt(w1.v):"—"}</b><span>śr. masa · 7 dni (${w1?w1.n:0} pom.)</span></div>
+    <div class="stat"><b>${d==null?"—":(d>0?"+":"")+fmt(d)}</b><span>kg vs poprzedni tydzień</span></div>
+    <div class="stat"><b>${wa[0]?fmt(wa[0].waist):"—"}</b><span>talia${wa[1]?" ("+(wa[0].waist-wa[1].waist>0?"+":"")+fmt(wa[0].waist-wa[1].waist)+")":""}</span></div></div>
+    <p class="hint">Cel redukcji: ok. 0,3–0,5 kg tygodniowo w średniej. Pojedynczy dzień nic nie znaczy.</p></section>`}
 function renderPomiar(){
   const lastM=entries.find(e=>e.kind==="pomiar");
   const f=ls.get("pom-form",{kg:lastM?lastM.kg:80.6,waist:lastM?lastM.waist:84});
   return `<section class="card"><h2>Pomiar</h2>
-    <p class="hint">Rano, na czczo, po toalecie. Talia na wysokości pępka, na wydechu.</p>
+    <p class="hint">Waga codziennie rano, na czczo, po toalecie. Talia raz w tygodniu, na wysokości pępka, na wydechu. Pole talii po zapisie się czyści, w dzień pomiaru talii dotknij +.</p>
     <div class="two">${stepper("kg",f.kg,"masa · kg")}${stepper("waist",f.waist,"talia · cm")}</div>
     <div class="meta num"><span>${lastM?"Ost.: "+fmt(lastM.kg)+" kg"+(lastM.waist?" · "+fmt(lastM.waist)+" cm":""):"Brak pomiarów"}</span></div>
-    <button class="primary" id="save-pom">Zapisz pomiar</button></section>`;
+    <button class="primary" id="save-pom">Zapisz pomiar</button></section>${weekStats()}`;
 }
 let armed=null,savingNow=false;
 function renderHist(){
@@ -635,7 +648,7 @@ function bump(id,dir){
   if(tab==="sila"){const [kind,key]=id.split("-"),ex=findEx(key),it=itemOf(key);
     if(kind==="w")it.w=Math.max(0,Math.round(((it.w||0)+dir*ex.step)*10)/10); else it.r=Math.max(1,(it.r||0)+dir*(repUnit(it.ex)==="sek."?5:1)); saveDraft()}
   else if(tab==="bieg"){const b=bf(); if(id==="km")b.km=Math.max(0,Math.round(((b.km||0)+dir*0.5)*10)/10); else if(id==="hr")b.hr=Math.max(0,(b.hr||140)+dir); else b.min=Math.max(0,(b.min||0)+dir); ls.set("bieg-form",b)}
-  else if(tab==="pomiar"){const f=pf(); if(id==="kg")f.kg=Math.round(((f.kg||80)+dir*0.1)*10)/10; else f.waist=f.waist==null?84:Math.round((f.waist+dir*0.5)*10)/10; ls.set("pom-form",f)}
+  else if(tab==="pomiar"){const f=pf(); if(id==="kg")f.kg=Math.round(((f.kg||80)+dir*0.1)*10)/10; else {const lw=(entries.find(e=>e.kind==="pomiar"&&e.waist)||{}).waist||84; f.waist=f.waist==null?lw:Math.round((f.waist+dir*0.5)*10)/10;} ls.set("pom-form",f)}
   render();
 }
 document.addEventListener("click",async ev=>{
@@ -683,7 +696,7 @@ document.addEventListener("click",async ev=>{
     savingNow=false; render(); return}
   if(b.dataset.run){const f=bf(); f.t=b.dataset.run; if(f.t==="Test 5 km")f.km=5; ls.set("bieg-form",f); render(); return}
   if(b.id==="save-run"){const f=bf(); b.disabled=true; try{await addEntry({kind:"bieg",runType:f.t,km:f.km,min:f.min,hr:f.hr||null}); toast("Zapisano bieg w arkuszu")}catch(e){toast("Brak zasięgu · bieg czeka w kolejce")} render(); return}
-  if(b.id==="save-pom"){const f=pf(); b.disabled=true; try{await addEntry({kind:"pomiar",kg:f.kg,waist:f.waist}); toast("Zapisano pomiar w arkuszu")}catch(e){toast("Brak zasięgu · pomiar czeka w kolejce")} render(); return}
+  if(b.id==="save-pom"){const f=pf(); b.disabled=true; try{await addEntry({kind:"pomiar",kg:f.kg,waist:f.waist}); toast("Zapisano pomiar w arkuszu")}catch(e){toast("Brak zasięgu · pomiar czeka w kolejce")} const g=pf(); g.waist=null; ls.set("pom-form",g); render(); return}
   if(b.dataset.edit){const e=entries.find(x=>x.id===b.dataset.edit);if(!e)return;if(draftHasSets()&&!draft.editId){toast("Masz niezapisany trening. Zapisz albo wyczyść go najpierw.");return}
     draft=draftFromEntry(e);saveDraft();tab="sila";document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab==="sila"));render();window.scrollTo(0,0);toast("Edytujesz zapisany trening. Popraw i kliknij Zapisz zmiany.");return}
   if(b.dataset.cancel){armed=null;render();return}
