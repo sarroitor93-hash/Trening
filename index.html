@@ -188,8 +188,8 @@ const TRI=["Prostowanie linką w dół","Prostowanie linką nad głową","Prosto
 const BW=["Podciąganie","Pompki","Pompki – nogi wyżej","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)"];
 const ALL=[...new Set(["Rozpiętki (maszyna)","Martwy ciąg","RDL","Przysiad hack","Suwnica","Przysiad ze sztangą",...KLATKA,...PLECY,...NOGI,...BOKI,...BIC,...TRI,...ABS,"Wznosy na łydki","Odwrotne rozpiętki","Face pull","Hip thrust","Wykroki","Dipy"])];
 function arms(){return {id:"ramiona",rest:90,title:"4 · Biceps + triceps",rule:"superseria · do upadku",min:false,
-     ex:[{key:"biceps",label:"Biceps",opts:BIC,def:0,sets:2,lo:8,hi:12,unit:"kg",step:1},
-         {key:"triceps",label:"Triceps",opts:TRI,def:1,sets:2,lo:8,hi:12,unit:"kg",step:2.5}]}}
+     ex:[{key:"biceps",label:"Biceps",opts:BIC,def:0,sets:2,lo:8,hi:15,unit:"kg",step:1},
+         {key:"triceps",label:"Triceps",opts:TRI,def:1,sets:2,lo:8,hi:15,unit:"kg",step:2.5}]}}
 function plan(type){
   if(type==="Dom") return [
     {id:"dom",title:"Dom · EMOM 24 min",rule:"4 rundy × 6 min · reszta minuty = odpoczynek",
@@ -205,7 +205,7 @@ function plan(type){
     :{key:"silaB",label:"Przysiad",opts:["Przysiad hack","Suwnica","Przysiad ze sztangą"],def:0,sets:4,lo:5,hi:6,unit:"kg",step:2.5};
   return [
     {id:"skoki",rest:60,title:"0 · Skoki",rule:"maks. wysokość · zejście krokiem · odpoczynek 1 min",nofail:true,min:false,
-     ex:[{key:"skoki",label:"Moc",opts:["Wskok na skrzynię","Skok w dal"],def:0,sets:3,lo:3,hi:3,unit:"cm",step:5,noProg:true}]},
+     ex:[{key:"skoki",label:"Moc",opts:["Wskok na skrzynię","Skok w dal"],def:0,sets:3,lo:5,hi:5,unit:"cm",step:5,noProg:true}]},
     {id:"sila",rest:180,title:"1 · Siła",rule:"RIR 1–2 · nie do upadku",nofail:true,min:true,ex:[sila]},
     {id:"gora",rest:150,title:"2 · Klatka + plecy",rule:"superseria · 1 RIR, upadek tylko w ostatniej serii",min:true,
      ex:[{key:"klatka",label:"Klatka",opts:KLATKA,def:A?0:C?1:2,sets:up,lo:6,hi:10,unit:"kg",step:2.5},
@@ -269,7 +269,7 @@ async function load(){
     const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json();
     if(!j.ok) throw new Error(j.error);
     const list=build(j.data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    oneTimeFixes(list);
+    oneTimeFixes(list).then(()=>oneTimeFix2(list));
   }catch(e){ setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -284,6 +284,17 @@ async function oneTimeFixes(list){
     if(it.key==="barki"){it.sets=[14,14,14]}
   }
   try{await removeEntry(e.id); await addEntry(fixed); ls.set(FIX,true); toast("Poprawiłem trening z 20.10: uginanie leżąc 3×8, odwodzenie 3×14")}catch(err){}
+}
+async function oneTimeFix2(list){
+  const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
+  const e=list.find(x=>x.id==="smvjdk4ang4xl"); if(!e){ls.set(FIX,true);return}
+  const sw=e.items.find(i=>i.key==="silaC"); if(!sw||sw.sets.length>=4){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id;
+  for(const it of fixed.items){
+    if(it.key==="silaC"){it.sets=[6,6,6,6];it.ws=[170,180,180,180];it.w=180}
+    if(it.key==="barki"){it.ex="Odwodzenie hantlami"}
+  }
+  try{await removeEntry(e.id); await addEntry(fixed); ls.set(FIX,true); toast("Poprawiłem trening z 22.10: suwnica 4 serie, odwodzenie hantlami")}catch(err){}
 }
 async function addEntry(e){
   e.date=e.date||new Date().toISOString(); e.id="s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
