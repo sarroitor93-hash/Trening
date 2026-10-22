@@ -342,6 +342,8 @@ function draftHasSets(){return draft&&(Object.values(draft.items).some(i=>!i.ski
 function setsFor(ex){return draft.minimum?Math.min(2,ex.sets):ex.sets}
 const XEX={step:2.5,unit:"kg",lo:8,hi:12,sets:3,noProg:true};
 function repUnit(name){return /sek\./.test(name)?"sek.":/rundy/.test(name)?"rundy":"powt."}
+function incomplete(){if(!draft||draft.type==="Dom")return [];const out=[];for(const s of plan(draft.type)){if(draft.minimum&&!s.min)continue;for(const ex of s.ex){const it=draft.items[ex.key];if(!it||it.skip)continue;const n=setsFor(ex)+(it.plus||0),done=it.sets.slice(0,n).filter(x=>x!=null).length;if(done>0&&done<n)out.push({key:ex.key,ex:it.ex,done,n})}}return out}
+function fillMissing(){for(const m of incomplete()){const it=draft.items[m.key],n=m.n;let lastR=null,lastW=it.w;for(let i=0;i<n;i++){if(it.sets[i]!=null){lastR=it.sets[i];if(it.ws&&it.ws[i]!=null)lastW=it.ws[i]}else if(lastR!=null){it.sets[i]=lastR;it.ws=it.ws||[];it.ws[i]=lastW}}}}
 function allItems(){const out=[];for(const s of plan(draft.type))for(const ex of s.ex){const it=draft.items[ex.key];if(it&&!it.skip)out.push([ex.key,it])}for(const x of (draft.extras||[]))if(x.ex)out.push(["extra",x]);return out}
 
 // ---------- Prefs: sound & vibration ----------
@@ -422,6 +424,7 @@ function renderSila(){
     draft.extras.forEach((x,i)=>{h+=exBlock(XEX,x,"x"+i,XEX.sets+(x.plus||0),false,true)});h+=`</section>`}
   h+=`<div class="two"><button class="ghost" id="add-ex">+ Ćwiczenie spoza planu</button><button class="ghost" id="add-time">+ Cardio / na czas</button></div>
     <input class="name" id="wnote" placeholder="Notatka do treningu, np. inna siłownia, samopoczucie" value="${esc(draft.note||"")}">
+    ${draft.checked&&incomplete().length?`<section class="card" id="incomplete" style="border-color:var(--warn)"><h2>Brakujące serie?</h2><ul style="margin:0;padding-left:18px">${incomplete().map(m=>`<li>${esc(m.ex)}: odhaczone ${m.done} z ${m.n}</li>`).join("")}</ul><div class="two"><button class="primary" id="fill-missing">Dopisz jak ostatnia</button><button class="ghost" id="save-anyway">Zapisz tak jak jest</button></div></section>`:""}
     <button class="primary" id="save" ${draftHasSets()?"":"disabled"}>${draft.editId?"Zapisz zmiany":"Zapisz trening"}</button>
     <button class="ghost" id="reset">${draft.editId?"Anuluj edycję":"Wyczyść bieżący trening"}</button>
     <datalist id="cardio-ex">${["Schody","Rower","Bieżnia","Wioślarz","Orbitrek","Skakanka","Ski erg"].map(n=>`<option value="${n}">`).join("")}</datalist>
@@ -657,6 +660,8 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.unskip){draft.items[b.dataset.unskip].skip=false; saveDraft(); render(); return}
   if(b.dataset.addset){const it=itemOf(b.dataset.addset); it.plus=(it.plus||0)+1; saveDraft(); render(); return}
   if(b.dataset.other){const it=draft.items[b.dataset.other]; it.other=true; saveDraft(); render(); const el=document.querySelector(`[data-name-for="${b.dataset.other}"]`); if(el) el.focus(); return}
+  if(b.id==="fill-missing"){fillMissing();saveDraft();render();toast("Dopisane. Sprawdź i kliknij Zapisz.");return}
+  if(b.id==="save-anyway"){draft.checked=true;draft.skipCheck=true;saveDraft();document.getElementById("save").click();return}
   if(b.id==="add-time"){draft.extras.push({mode:"time",ex:"",min:10,note:"",sets:[]}); saveDraft(); render(); return}
   if(b.dataset.noteopen){const it=itemOf(b.dataset.noteopen); it.noteOpen=true; saveDraft(); render(); const el=document.querySelector(`[data-note-for="${b.dataset.noteopen}"]`); if(el) el.focus(); return}
   if(b.dataset.snd){prefs.snd=b.dataset.snd;savePrefs();try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}beep(880,250);render();return}
@@ -665,7 +670,9 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.set){const it=itemOf(b.dataset.set),i=+b.dataset.i; if(it.sets[i]!=null){it.sets[i]=null;if(it.ws)it.ws[i]=null} else {if(restAt&&restDur-(Date.now()-restAt)/1000<=0)stopRest();it.sets[i]=it.r;it.ws=it.ws||[];it.ws[i]=it.w;if(!draft.start)draft.start=Date.now();const sl=slotOf(b.dataset.set);if(draft.type!=="Dom"&&roundDone(sl,i))startRest(sl?restFor(sl):90)} delete draft.auto; saveDraft(); render(); return}
   if(b.id==="reset"){draft=newDraft(nextType(),false);draft.auto=true;saveDraft();render();return}
   if(b.id==="save"){
-    if(savingNow) return; savingNow=true; b.disabled=true; b.textContent="Zapisuję…";
+    if(savingNow) return;
+    if(!draft.skipCheck&&!draft.checked&&incomplete().length){draft.checked=true;saveDraft();render();const el=document.getElementById("incomplete");if(el)el.scrollIntoView({block:"center"});return}
+    savingNow=true; b.disabled=true; b.textContent="Zapisuję…";
     const items=allItems().filter(([k,it])=>it.mode==="time"?it.min>0:it.sets.some(x=>x!=null)).map(([k,it])=>it.mode==="time"?{key:k,ex:it.ex,mode:"time",min:it.min,note:it.note||"",sets:[]}:{key:k,ex:it.ex,w:Math.max(it.w||0,...(it.ws||[]).filter(x=>x!=null)),ws:(it.ws||[]).slice(0,it.sets.length),sets:it.sets,note:it.note||""});
     const editId=draft.editId;
     const entry={kind:"sila",type:draft.type,minimum:draft.type!=="Dom"&&draft.minimum,items,note:draft.note||"",durMin:editId?draft.durMin:(draft.start?Math.round((Date.now()-draft.start)/60000):0)};
