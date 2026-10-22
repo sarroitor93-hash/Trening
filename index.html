@@ -211,7 +211,7 @@ function plan(type){
      ex:[{key:"klatka",label:"Klatka",opts:KLATKA,def:A?0:C?1:2,sets:up,lo:6,hi:10,unit:"kg",step:2.5},
          {key:"plecy",label:"Plecy",opts:PLECY,def:A?0:C?2:1,sets:up,lo:6,hi:10,unit:"kg",step:2.5}]},
     {id:"nogi",rest:90,title:"3 · Nogi + boki barków",rule:"superseria · do upadku",min:false,
-     ex:[{key:"nogi",label:A?"Nogi · po martwym: przód uda":C?"Nogi · po RDL: przód uda":"Nogi · po przysiadzie: tył uda",opts:[...PROST,...UGIN],def:C||A?0:1,sets:3,lo:8,hi:12,unit:"kg",step:2.5},
+     ex:[{key:"nogi",label:A?"Nogi · po martwym: przód uda":C?"Nogi · po RDL: przód uda · po suwnicy/hacku: tył uda":"Nogi · po przysiadzie: tył uda",opts:[...PROST,...UGIN],def:C||A?0:1,sets:3,lo:8,hi:12,unit:"kg",step:2.5},
          {key:"barki",label:"Barki",opts:[...BOKI,...TYL],def:A?0:C?2:1,sets:3,lo:10,hi:15,unit:"kg",step:1}]},
     arms(),
     {id:"brzuch",rest:60,title:"5 · Brzuch (jeśli jest czas)",rule:"opcjonalnie · 2 serie",min:false,
