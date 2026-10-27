@@ -455,6 +455,7 @@ function renderBieg(){
     <div class="meta num"><span>Tempo: <b>${paceTxt}</b></span><span>${last?"Ost.: "+esc(last.runType)+" · "+fmt(last.km)+" km"+(last.hr?" · "+last.hr+" bpm":""):""}</span></div>
     <button class="primary" id="save-run">Zapisz bieg</button></section>`;
 }
+function nowLocal(){const d=new Date(),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes())}
 function weekStats(){
   const ms=entries.filter(e=>e.kind==="pomiar"&&e.kg>0),day=d=>new Date(d).toDateString(),now=Date.now();
   const byDay={};for(const e of ms.slice().reverse())byDay[day(e.date)]=e;
@@ -474,7 +475,7 @@ function renderPomiar(){
   return `<section class="card"><h2>Pomiar</h2>
     <p class="hint">Waga codziennie rano, na czczo, po toalecie. Talia raz w tygodniu, na wysokości pępka, na wydechu. Pole talii po zapisie się czyści, w dzień pomiaru talii dotknij +.</p>
     <div class="two">${stepper("kg",f.kg,"masa · kg")}${stepper("waist",f.waist,"talia · cm")}</div>
-    <div class="chips">${[[0,"Dziś rano"],[1,"Wczoraj rano"],[2,"Przedwczoraj rano"]].map(([d,l])=>`<button class="chip" data-pday="${d}" aria-pressed="${(f.day||0)===d}">${l}</button>`).join("")}</div>
+    <label class="ex-label" for="pdt">Data i godzina pomiaru</label><input class="name" type="datetime-local" id="pdt" value="${esc(f.dt||nowLocal())}">
     <div class="meta num"><span>${lastM?"Ost.: "+fmt(lastM.kg)+" kg"+(lastM.waist?" · "+fmt(lastM.waist)+" cm":""):"Brak pomiarów"}</span></div>
     <button class="primary" id="save-pom">Zapisz pomiar</button></section>${weekStats()}`;
 }
@@ -676,7 +677,6 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.other){const it=draft.items[b.dataset.other]; it.other=true; saveDraft(); render(); const el=document.querySelector(`[data-name-for="${b.dataset.other}"]`); if(el) el.focus(); return}
   if(b.id==="fill-missing"){fillMissing();saveDraft();render();toast("Dopisane. Sprawdź i kliknij Zapisz.");return}
   if(b.id==="save-anyway"){draft.checked=true;draft.skipCheck=true;saveDraft();document.getElementById("save").click();return}
-  if(b.dataset.pday){const f=pf();f.day=+b.dataset.pday;ls.set("pom-form",f);render();return}
   if(b.id==="add-time"){draft.extras.push({mode:"time",ex:"",min:10,note:"",sets:[]}); saveDraft(); render(); return}
   if(b.dataset.noteopen){const it=itemOf(b.dataset.noteopen); it.noteOpen=true; saveDraft(); render(); const el=document.querySelector(`[data-note-for="${b.dataset.noteopen}"]`); if(el) el.focus(); return}
   if(b.dataset.snd){prefs.snd=b.dataset.snd;savePrefs();try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}beep(880,250);render();return}
@@ -698,7 +698,7 @@ document.addEventListener("click",async ev=>{
     savingNow=false; render(); return}
   if(b.dataset.run){const f=bf(); f.t=b.dataset.run; if(f.t==="Test 5 km")f.km=5; ls.set("bieg-form",f); render(); return}
   if(b.id==="save-run"){const f=bf(); b.disabled=true; try{await addEntry({kind:"bieg",runType:f.t,km:f.km,min:f.min,hr:f.hr||null}); toast("Zapisano bieg w arkuszu")}catch(e){toast("Brak zasięgu · bieg czeka w kolejce")} render(); return}
-  if(b.id==="save-pom"){const f=pf(); b.disabled=true; try{const dt=new Date();dt.setDate(dt.getDate()-(f.day||0));dt.setHours(7,0,0,0); await addEntry({kind:"pomiar",kg:f.kg,waist:f.waist,date:dt.toISOString()}); toast("Zapisano pomiar w arkuszu")}catch(e){toast("Brak zasięgu · pomiar czeka w kolejce")} const g=pf(); g.waist=null; g.day=0; ls.set("pom-form",g); render(); return}
+  if(b.id==="save-pom"){const f=pf(); b.disabled=true; try{const dt=f.dt?new Date(f.dt):new Date(); await addEntry({kind:"pomiar",kg:f.kg,waist:f.waist,date:dt.toISOString()}); toast("Zapisano pomiar w arkuszu")}catch(e){toast("Brak zasięgu · pomiar czeka w kolejce")} const g=pf(); g.waist=null; delete g.dt; ls.set("pom-form",g); render(); return}
   if(b.dataset.edit){const e=entries.find(x=>x.id===b.dataset.edit);if(!e)return;if(draftHasSets()&&!draft.editId){toast("Masz niezapisany trening. Zapisz albo wyczyść go najpierw.");return}
     draft=draftFromEntry(e);saveDraft();tab="sila";document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab==="sila"));render();window.scrollTo(0,0);toast("Edytujesz zapisany trening. Popraw i kliknij Zapisz zmiany.");return}
   if(b.dataset.cancel){armed=null;render();return}
@@ -709,6 +709,7 @@ document.addEventListener("change",ev=>{
   if(el.dataset.nameFor){const k=el.dataset.nameFor,it=itemOf(k),name=el.value.trim(); if(name){it.ex=name; if(it.mode!=="time"){const last=lastFor(name); if(last) it.w=last.w;} it.other=false} saveDraft(); render(); return}
   const v=parse(el.value);
   if(el.id==="t-custom") return;
+  if(el.id==="pdt"){const f=pf();f.dt=el.value;ls.set("pom-form",f);return}
   if(el.id==="wnote"){draft.note=el.value.trim();saveDraft();return}
   if(el.dataset.noteFor){const it=itemOf(el.dataset.noteFor);it.note=el.value.trim();saveDraft();return}
   if(el.id.startsWith("m-")){const it=itemOf(el.id.slice(2));const v2=parse(el.value);if(v2!=null)it.min=Math.max(0,v2);saveDraft();render();return}
