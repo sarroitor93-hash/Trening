@@ -269,7 +269,7 @@ async function load(){
     const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json();
     if(!j.ok) throw new Error(j.error);
     const list=build(j.data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    oneTimeFixes(list).then(()=>oneTimeFix2(list));
+    oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list));
   }catch(e){ setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -284,6 +284,13 @@ async function oneTimeFixes(list){
     if(it.key==="barki"){it.sets=[14,14,14]}
   }
   try{await removeEntry(e.id); await addEntry(fixed); ls.set(FIX,true); toast("Poprawiłem trening z 20.10: uginanie leżąc 3×8, odwodzenie 3×14")}catch(err){}
+}
+async function oneTimeAdd3(list){
+  const FIX="add-28-10-hyrox"; if(ls.get(FIX,false)) return;
+  if(list.some(e=>e.kind==="sila"&&(e.items||[]).some(i=>/Hyrox/.test(i.ex)))){ls.set(FIX,true);return}
+  try{await addEntry({kind:"sila",type:"Hyrox",minimum:false,date:"2026-10-28T06:00:00.000Z",durMin:42,note:"Zajęcia Hyrox (Multisport)",
+    items:[{key:"extra",ex:"Hyrox EMOM 7'×6",mode:"time",min:42,sets:[],note:"Bieg 200 m, 8 devil press 2×15 kg, 25–30 wykroków z workiem 20 kg, 25 wall balli 9 kg, 12 kcal ski erg, sanie ciąg+pchanie; ok. 60–70% objętości; najsłabiej bieg, potem devil press"}]});
+    ls.set(FIX,true); toast("Dopisałem Hyrox z 28.10")}catch(err){}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
