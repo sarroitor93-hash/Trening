@@ -228,6 +228,7 @@ let cfg=ls.get("cfg",{url:"",key:""});
 const ready=()=>!!(cfg.url&&cfg.key);
 function setSync(t,err){const el=$("#sync");el.textContent=t;el.classList.toggle("err",!!err)}
 const nz=v=>v===""||v==null?null:Number(v);
+const DEFAULT_GYM="Zdrofit Kłobucka";
 function build(d){
   const out=[], byId={};
   for(const r of d.gym||[]){
@@ -242,6 +243,7 @@ function build(d){
     if(r[17]!==""&&r[17]!=null)it.note=String(r[17]);
     e.items.push(it);
   }
+  for(const e of out) if(e.kind==="sila"&&!e.gym&&e.type!=="Dom"&&e.type!=="Hyrox") e.gym=DEFAULT_GYM;
   for(const r of d.run||[]) out.push({id:String(r[5]),kind:"bieg",date:r[0],runType:String(r[1]),km:Number(r[2])||0,min:Number(r[3])||0,hr:nz(r[6])});
   for(const r of d.meas||[]) out.push({id:String(r[3]),kind:"pomiar",date:r[0],kg:Number(r[1])||0,waist:nz(r[2])});
   return out;
@@ -328,7 +330,7 @@ function lastFor(exName){const g=draft&&draft.gym,list=strength().filter(e=>(e.i
   let e=list[0];if(g&&!freeWeight(exName)){const same=list.find(x=>x.gym===g),nog=list.find(x=>!x.gym);e=same||nog||list[0];const it=e.items.find(i=>i.ex===exName);return e.gym&&e.gym!==g?Object.assign({},it,{otherGym:e.gym}):it}
   return e.items.find(i=>i.ex===exName)}
 function regym(){if(!draft)return;for(const k in draft.items){const it=draft.items[k];if(it.sets.some(x=>x!=null))continue;const last=lastFor(it.ex);it.w=last?last.w:(it.ex in START?START[it.ex]:it.w)}}
-function gyms(){const s=new Set();for(const e of strength())if(e.gym)s.add(e.gym);for(const g of ls.get("gyms",[]))s.add(g);return [...s]}
+function gyms(){const s=new Set([DEFAULT_GYM]);for(const e of strength())if(e.gym)s.add(e.gym);for(const g of ls.get("gyms",[]))s.add(g);return [...s]}
 function lastChoice(type,key){for(const e of strength()){if(e.type!==type)continue;const it=(e.items||[]).find(i=>i.key===key);if(it)return it.ex}return null}
 const e1rm=(w,r)=>r>0?w*(1+r/30):0;
 
@@ -436,7 +438,7 @@ function renderSila(){
     ${["A","B","C","Dom"].map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
     ${dom?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">Tryb minimum</button>`}</div>
     <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka A → B → C idzie dalej.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+nextType()+"</b>. Kolejka A → B → C, niezależnie od dnia. Dzień po dniu: nie rób C po A ani A po C (dwa razy zawias)."}</p>`;
-  if(!dom){const G=gyms();if(draft.gym===undefined){draft.gym=(strength().find(e=>e.gym)||{}).gym||"";regym();saveDraft()}
+  if(!dom){const G=gyms();if(draft.gym===undefined||draft.gym===""){draft.gym=DEFAULT_GYM;regym();saveDraft()}
     h+=`<div class="chips">${G.map(g=>`<button class="chip" data-gym="${esc(g)}" aria-pressed="${draft.gym===g}">${esc(g)}</button>`).join("")}<button class="chip" id="gym-add">+ Siłownia</button></div>${draft.gymNew?`<div class="row"><input class="name" id="gym-new" placeholder="Nazwa siłowni, np. Zdrofit Pruszków"><button class="ghost" id="gym-ok">Dodaj</button></div>`:""}`}
   if(draft.editId) h+=`<p class="hint" style="color:var(--warn);font-weight:600">Edycja treningu z ${new Date(draft.editDate).toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})}. Nowe serie: ustaw powtórzenia i dotknij kwadratu.</p>`;
   if(draft.start&&draftHasSets()&&!draft.editId) h+=`<p class="hint num">Trening trwa: <b>${mmssR((Date.now()-draft.start)/1000)}</b> (od pierwszej serii)</p>`;
@@ -708,7 +710,7 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.other){const it=draft.items[b.dataset.other]; it.other=true; saveDraft(); render(); const el=document.querySelector(`[data-name-for="${b.dataset.other}"]`); if(el) el.focus(); return}
   if(b.id==="fill-missing"){fillMissing();saveDraft();render();toast("Dopisane. Sprawdź i kliknij Zapisz.");return}
   if(b.id==="save-anyway"){draft.checked=true;draft.skipCheck=true;saveDraft();document.getElementById("save").click();return}
-  if(b.dataset.gym!==undefined&&b.classList.contains("chip")){draft.gym=draft.gym===b.dataset.gym?"":b.dataset.gym;regym();saveDraft();render();return}
+  if(b.dataset.gym!==undefined&&b.classList.contains("chip")){draft.gym=b.dataset.gym;regym();saveDraft();render();return}
   if(b.id==="gym-add"){draft.gymNew=!draft.gymNew;saveDraft();render();const el=$("#gym-new");if(el)el.focus();return}
   if(b.id==="gym-ok"){const v=($("#gym-new").value||"").trim();if(v){const L=ls.get("gyms",[]);if(!L.includes(v))L.push(v);ls.set("gyms",L);draft.gym=v;regym()}draft.gymNew=false;saveDraft();render();return}
   if(b.id==="add-time"){draft.extras.push({mode:"time",ex:"",min:10,note:"",sets:[]}); saveDraft(); render(); return}
