@@ -235,7 +235,7 @@ function build(d){
     if(!e){e=byId[id]={id,kind:"sila",date:r[0],type:String(r[1]),minimum:r[2]==="minimum",items:[]};out.push(e)}
     const sets=r.slice(6,11).map(nz); while(sets.length&&sets[sets.length-1]==null) sets.pop();
     if(r[18]!==""&&r[18]!=null)e.durMin=Number(r[18]);
-    if(r[19]!==""&&r[19]!=null)e.note=String(r[19]);
+    if(r[19]!==""&&r[19]!=null){const nt=String(r[19]),m=nt.match(/^@([^|]+)\|\s?([\s\S]*)$/);if(m){e.gym=m[1].trim();e.note=m[2]}else{e.note=nt;if(/zdrofit/i.test(nt))e.gym="Zdrofit Pruszków";else if(/city ?fit/i.test(nt))e.gym="City Fit Siedlce"}}
     const it={key:String(r[3]),ex:String(r[4]),w:Number(r[5])||0,sets};
     if(r[15]!==""&&r[15]!=null){const ws=String(r[15]).split("/").map(x=>Number(String(x).replace(",",".")));if(ws.length)it.ws=ws}
     if(r[16]!==""&&r[16]!=null){it.mode="time";it.min=Number(r[16])}
@@ -283,14 +283,15 @@ async function oneTimeFixes(list){
     if(it.key==="nogi"){it.ex="Uginanie nóg leżąc (maszyna)";it.sets=[8,8,8]}
     if(it.key==="barki"){it.sets=[14,14,14]}
   }
-  try{await removeEntry(e.id); await addEntry(fixed); ls.set(FIX,true); toast("Poprawiłem trening z 20.10: uginanie leżąc 3×8, odwodzenie 3×14")}catch(err){}
+  ls.set(FIX,true); try{await removeEntry(e.id); await addEntry(fixed); toast("Poprawiłem trening z 20.10: uginanie leżąc 3×8, odwodzenie 3×14")}catch(err){ls.set(FIX,false)}
 }
 async function oneTimeAdd3(list){
   const FIX="add-28-10-hyrox"; if(ls.get(FIX,false)) return;
   if(list.some(e=>e.kind==="sila"&&(e.items||[]).some(i=>/Hyrox/.test(i.ex)))){ls.set(FIX,true);return}
+  ls.set(FIX,true);
   try{await addEntry({kind:"sila",type:"Hyrox",minimum:false,date:"2026-10-28T06:00:00.000Z",durMin:42,note:"Zajęcia Hyrox (Multisport)",
     items:[{key:"extra",ex:"Hyrox EMOM 7'×6",mode:"time",min:42,sets:[],note:"Bieg 200 m, 8 devil press 2×15 kg, 25–30 wykroków z workiem 20 kg, 25 wall balli 9 kg, 12 kcal ski erg, sanie ciąg+pchanie; ok. 60–70% objętości; najsłabiej bieg, potem devil press"}]});
-    ls.set(FIX,true); toast("Dopisałem Hyrox z 28.10")}catch(err){}
+    toast("Dopisałem Hyrox z 28.10")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
@@ -301,7 +302,7 @@ async function oneTimeFix2(list){
     if(it.key==="silaC"){it.sets=[6,6,6,6];it.ws=[170,180,180,180];it.w=180}
     if(it.key==="barki"){it.ex="Odwodzenie hantlami"}
   }
-  try{await removeEntry(e.id); await addEntry(fixed); ls.set(FIX,true); toast("Poprawiłem trening z 22.10: suwnica 4 serie, odwodzenie hantlami")}catch(err){}
+  ls.set(FIX,true); try{await removeEntry(e.id); await addEntry(fixed); toast("Poprawiłem trening z 22.10: suwnica 4 serie, odwodzenie hantlami")}catch(err){ls.set(FIX,false)}
 }
 async function addEntry(e){
   e.date=e.date||new Date().toISOString(); e.id="s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -322,7 +323,12 @@ window.addEventListener("offline",syncLabel);
 // ---------- Derived from history ----------
 const strength=()=>entries.filter(e=>e.kind==="sila");
 function nextType(){const s=strength().find(e=>["A","B","C"].includes(e.type));return s?({A:"B",B:"C",C:"A"})[s.type]:"A"}
-function lastFor(exName){for(const e of strength()){const it=(e.items||[]).find(i=>i.ex===exName);if(it)return it}return null}
+const freeWeight=n=>/hantl|sztang|Martwy ciąg|RDL|kettl|Swing|Pompk|Podciąg|Wskok|Skok|bułgarsk|Push press|Kółko|Deska/i.test(n);
+function lastFor(exName){const g=draft&&draft.gym,list=strength().filter(e=>(e.items||[]).some(i=>i.ex===exName));if(!list.length)return null;
+  let e=list[0];if(g&&!freeWeight(exName)){const same=list.find(x=>x.gym===g),nog=list.find(x=>!x.gym);e=same||nog||list[0];const it=e.items.find(i=>i.ex===exName);return e.gym&&e.gym!==g?Object.assign({},it,{otherGym:e.gym}):it}
+  return e.items.find(i=>i.ex===exName)}
+function regym(){if(!draft)return;for(const k in draft.items){const it=draft.items[k];if(it.sets.some(x=>x!=null))continue;const last=lastFor(it.ex);it.w=last?last.w:(it.ex in START?START[it.ex]:it.w)}}
+function gyms(){const s=new Set();for(const e of strength())if(e.gym)s.add(e.gym);for(const g of ls.get("gyms",[]))s.add(g);return [...s]}
 function lastChoice(type,key){for(const e of strength()){if(e.type!==type)continue;const it=(e.items||[]).find(i=>i.key===key);if(it)return it.ex}return null}
 const e1rm=(w,r)=>r>0?w*(1+r/30):0;
 
@@ -336,7 +342,7 @@ function newDraft(type,minimum){
 }
 function saveDraft(){ls.set("draft",draft)}
 function draftFromEntry(e){
-  const d=newDraft(e.type,e.minimum); d.extras=[]; d.editId=e.id; d.editDate=e.date; d.note=e.note||""; d.durMin=e.durMin||0;
+  const d=newDraft(e.type,e.minimum); d.extras=[]; d.editId=e.id; d.editDate=e.date; d.note=e.note||""; d.gym=e.gym||""; d.durMin=e.durMin||0;
   for(const k in d.items) d.items[k].skip=true;
   for(const it of e.items||[]){
     const copy={ex:it.ex,w:it.w,r:(it.sets||[]).find(x=>x!=null)||10,sets:(it.sets||[]).slice(),ws:(it.ws||[]).slice(),note:it.note||""};
@@ -407,7 +413,7 @@ function exBlock(ex,it,key,n,dom,extra){
   if(it.skip) return `<div class="ex skipped"><div class="ex-top"><span class="ex-label">${esc(ex.label)} · ${esc(it.ex)}</span><button class="mini" data-unskip="${key}">Przywróć</button></div><span class="hint">Pominięte w tym treningu</span></div>`;
   while(it.sets.length<n) it.sets.push(null);
   const last=it.ex?lastFor(it.ex):null; let lastTxt="Pierwszy raz",up=false;
-  if(last){const rs=(last.sets||[]).filter(x=>x!=null);lastTxt=`Ost.: ${last.ws&&last.ws.length>1?last.ws.map(fmt).join("/"):fmt(last.w)} ${ex.unit} · ${rs.join("/")}${last.note?" · „"+esc(last.note)+"”":""}`;
+  if(last){const rs=(last.sets||[]).filter(x=>x!=null);lastTxt=`Ost.${last.otherGym?" ("+esc(last.otherGym)+")":""}: ${last.ws&&last.ws.length>1?last.ws.map(fmt).join("/"):fmt(last.w)} ${ex.unit} · ${rs.join("/")}${last.note?" · „"+esc(last.note)+"”":""}`;
     const L=last.sets||[];up=!ex.noProg&&ex.unit==="kg"&&L[0]!=null&&L[0]>=ex.hi&&(L.length<2||(L[1]!=null&&L[1]>=ex.hi))&&it.w<=last.w}
   const custom=!extra&&ex.opts&&!ex.opts.includes(it.ex);
   const chips=extra?"":`<div class="chips">${ex.opts.map(o=>`<button class="chip" data-ex="${key}" data-name="${esc(o)}" aria-pressed="${o===it.ex}">${esc(o)}</button>`).join("")}<button class="chip" data-other="${key}" aria-pressed="${custom||!!it.other}">Inne…</button></div>`;
@@ -430,6 +436,8 @@ function renderSila(){
     ${["A","B","C","Dom"].map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
     ${dom?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">Tryb minimum</button>`}</div>
     <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka A → B → C idzie dalej.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+nextType()+"</b>. Kolejka A → B → C, niezależnie od dnia. Dzień po dniu: nie rób C po A ani A po C (dwa razy zawias)."}</p>`;
+  if(!dom){const G=gyms();if(draft.gym===undefined){draft.gym=(strength().find(e=>e.gym)||{}).gym||"";regym();saveDraft()}
+    h+=`<div class="chips">${G.map(g=>`<button class="chip" data-gym="${esc(g)}" aria-pressed="${draft.gym===g}">${esc(g)}</button>`).join("")}<button class="chip" id="gym-add">+ Siłownia</button></div>${draft.gymNew?`<div class="row"><input class="name" id="gym-new" placeholder="Nazwa siłowni, np. Zdrofit Pruszków"><button class="ghost" id="gym-ok">Dodaj</button></div>`:""}`}
   if(draft.editId) h+=`<p class="hint" style="color:var(--warn);font-weight:600">Edycja treningu z ${new Date(draft.editDate).toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})}. Nowe serie: ustaw powtórzenia i dotknij kwadratu.</p>`;
   if(draft.start&&draftHasSets()&&!draft.editId) h+=`<p class="hint num">Trening trwa: <b>${mmssR((Date.now()-draft.start)/1000)}</b> (od pierwszej serii)</p>`;
   if(dom) h+=renderTimerCard();
@@ -518,7 +526,7 @@ function renderHist(){
   for(const e of entries.slice(0,60)){
     const dd=new Date(e.date),dt=dd.toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})+", "+dd.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"});
     let body="",badge="";
-    if(e.kind==="sila"){badge=`<span class="badge">${esc(e.type)}</span>${e.minimum?"minimum":""}`;body=`<ul>${(e.items||[]).filter(i=>i.mode==="time"||(i.sets||[]).some(x=>x!=null)).map(i=>`<li>${esc(i.ex)}: ${i.mode==="time"?fmt(i.min||0)+" min":(i.ws&&i.ws.filter(x=>x!=null).length>1?i.ws.filter(x=>x!=null).map(fmt).join("/"):fmt(i.w))+" × "+(i.sets||[]).filter(x=>x!=null).join("/")}${i.note?" · <i>"+esc(i.note)+"</i>":""}</li>`).join("")}${e.durMin?`<li>Czas: ${e.durMin} min</li>`:""}${e.note?`<li><i>${esc(e.note)}</i></li>`:""}</ul>`}
+    if(e.kind==="sila"){badge=`<span class="badge">${esc(e.type)}</span>${e.minimum?"minimum":""}${e.gym?" "+esc(e.gym):""}`;body=`<ul>${(e.items||[]).filter(i=>i.mode==="time"||(i.sets||[]).some(x=>x!=null)).map(i=>`<li>${esc(i.ex)}: ${i.mode==="time"?fmt(i.min||0)+" min":(i.ws&&i.ws.filter(x=>x!=null).length>1?i.ws.filter(x=>x!=null).map(fmt).join("/"):fmt(i.w))+" × "+(i.sets||[]).filter(x=>x!=null).join("/")}${i.note?" · <i>"+esc(i.note)+"</i>":""}</li>`).join("")}${e.durMin?`<li>Czas: ${e.durMin} min</li>`:""}${e.note?`<li><i>${esc(e.note)}</i></li>`:""}</ul>`}
     else if(e.kind==="bieg"){badge=`<span class="badge">Bieg</span>${esc(e.runType)}`;body=`<ul><li>${fmt(e.km)} km · ${fmt(e.min)} min${e.hr?" · "+e.hr+" bpm":""}</li></ul>`}
     else{badge=`<span class="badge">Pomiar</span>`;body=`<ul><li>${fmt(e.kg)} kg${e.waist?" · talia "+fmt(e.waist)+" cm":""}</li></ul>`}
     h+=`<div class="entry"><div class="entry-h"><span>${badge}</span><span class="num" style="font-size:13px;color:var(--muted)">${dt} ${armed===e.id?`<span class="confirm">Usunąć? <button class="del arm" data-del="${esc(e.id)}">Tak, usuń</button><button class="del" data-cancel="1">Nie</button></span>`:`${e.kind==="sila"?`<button class="del" data-edit="${esc(e.id)}">Edytuj</button>`:""}<button class="del" data-del="${esc(e.id)}">Usuń</button>`}</span></div>${body}</div>`;
@@ -700,6 +708,9 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.other){const it=draft.items[b.dataset.other]; it.other=true; saveDraft(); render(); const el=document.querySelector(`[data-name-for="${b.dataset.other}"]`); if(el) el.focus(); return}
   if(b.id==="fill-missing"){fillMissing();saveDraft();render();toast("Dopisane. Sprawdź i kliknij Zapisz.");return}
   if(b.id==="save-anyway"){draft.checked=true;draft.skipCheck=true;saveDraft();document.getElementById("save").click();return}
+  if(b.dataset.gym!==undefined&&b.classList.contains("chip")){draft.gym=draft.gym===b.dataset.gym?"":b.dataset.gym;regym();saveDraft();render();return}
+  if(b.id==="gym-add"){draft.gymNew=!draft.gymNew;saveDraft();render();const el=$("#gym-new");if(el)el.focus();return}
+  if(b.id==="gym-ok"){const v=($("#gym-new").value||"").trim();if(v){const L=ls.get("gyms",[]);if(!L.includes(v))L.push(v);ls.set("gyms",L);draft.gym=v;regym()}draft.gymNew=false;saveDraft();render();return}
   if(b.id==="add-time"){draft.extras.push({mode:"time",ex:"",min:10,note:"",sets:[]}); saveDraft(); render(); return}
   if(b.dataset.noteopen){const it=itemOf(b.dataset.noteopen); it.noteOpen=true; saveDraft(); render(); const el=document.querySelector(`[data-note-for="${b.dataset.noteopen}"]`); if(el) el.focus(); return}
   if(b.dataset.snd){prefs.snd=b.dataset.snd;savePrefs();try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}beep(880,250);render();return}
@@ -716,7 +727,7 @@ document.addEventListener("click",async ev=>{
     savingNow=true; b.disabled=true; b.textContent="Zapisuję…";
     const items=allItems().filter(([k,it])=>it.mode==="time"?it.min>0:it.sets.some(x=>x!=null)).map(([k,it])=>it.mode==="time"?{key:k,ex:it.ex,mode:"time",min:it.min,note:it.note||"",sets:[]}:{key:k,ex:it.ex,w:Math.max(it.w||0,...(it.ws||[]).filter(x=>x!=null)),ws:(it.ws||[]).slice(0,it.sets.length),sets:it.sets,note:it.note||""});
     const editId=draft.editId;
-    const entry={kind:"sila",type:draft.type,minimum:draft.type!=="Dom"&&draft.minimum,items,note:draft.note||"",durMin:editId?draft.durMin:(draft.start?Math.round((Date.now()-draft.start)/60000):0)};
+    const entry={kind:"sila",type:draft.type,minimum:draft.type!=="Dom"&&draft.minimum,items,note:(draft.gym&&draft.type!=="Dom"?"@"+draft.gym+" | ":"")+(draft.note||""),durMin:editId?draft.durMin:(draft.start?Math.round((Date.now()-draft.start)/60000):0)};
     if(editId) entry.date=draft.editDate;
     ls.del("draft"); draft=null; stopRest(); setTimeout(clearNotif,120);
     try{if(editId){await removeEntry(editId)} await addEntry(entry); toast(editId?"Poprawiono trening w arkuszu":"Zapisano w arkuszu · "+items.length+" ćw.")}
@@ -734,7 +745,7 @@ document.addEventListener("change",ev=>{
   const el=ev.target; if(el.tagName!=="INPUT") return;
   if(el.dataset.nameFor){const k=el.dataset.nameFor,it=itemOf(k),name=el.value.trim(); if(name){it.ex=name; if(it.mode!=="time"){const last=lastFor(name); if(last) it.w=last.w;} it.other=false} saveDraft(); render(); return}
   const v=parse(el.value);
-  if(el.id==="t-custom") return;
+  if(el.id==="t-custom"||el.id==="gym-new") return;
   if(el.id==="pdt"){const f=pf();f.dt=el.value;ls.set("pom-form",f);return}
   if(el.id==="wnote"){draft.note=el.value.trim();saveDraft();return}
   if(el.dataset.noteFor){const it=itemOf(el.dataset.noteFor);it.note=el.value.trim();saveDraft();return}
