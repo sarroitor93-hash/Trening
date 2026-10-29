@@ -356,32 +356,35 @@ function allItems(){const out=[];for(const s of plan(draft.type))for(const ex of
 // ---------- Prefs: sound & vibration ----------
 let prefs=Object.assign({snd:"cicho",vib:true,notif:false},ls.get("prefs",{}));
 const savePrefs=()=>ls.set("prefs",prefs);
-function vib(pat){try{if(prefs.vib&&navigator.vibrate)navigator.vibrate(pat)}catch(e){}}
+const NATIVE=window.TreningNative||null;
+function vib(pat){try{if(!prefs.vib)return;if(NATIVE){NATIVE.vibrate(Array.isArray(pat)?pat[0]:pat);return}if(navigator.vibrate)navigator.vibrate(pat)}catch(e){}}
 // ---------- Status notification (pasek powiadomień) ----------
-const canNotif=()=>prefs.notif&&"Notification" in window&&Notification.permission==="granted"&&"serviceWorker" in navigator;
+const canNotif=()=>!NATIVE&&prefs.notif&&"Notification" in window&&Notification.permission==="granted"&&"serviceWorker" in navigator;
 function nextUp(){if(!draft||draft.type==="Dom")return null;for(const s of plan(draft.type)){if(draft.minimum&&!s.min)continue;for(const ex of s.ex){const it=draft.items[ex.key];if(!it||it.skip)continue;const n=setsFor(ex)+(it.plus||0),done=it.sets.slice(0,n).filter(x=>x!=null).length;if(done<n)return `${it.ex} · seria ${done+1}/${n}${ex.unit==="kg"&&it.w?" · "+fmt(it.w)+" kg":""}`}}return null}
 function hhmmss(t){return new Date(t).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
 function statusNotif(title,body,alert){if(!canNotif())return;navigator.serviceWorker.ready.then(r=>r.showNotification(title,{body,tag:"trening",renotify:!!alert,silent:!alert,vibrate:alert&&prefs.vib?[300,120,300,120,300]:undefined,icon:"icon-192.png",badge:"icon-192.png"})).catch(()=>{})}
-function clearNotif(){if(!("serviceWorker" in navigator))return;navigator.serviceWorker.ready.then(r=>r.getNotifications({tag:"trening"})).then(ns=>ns.forEach(n=>n.close())).catch(()=>{})}
-function notifIdle(){const nx=nextUp();if(draft&&draft.start&&draftHasSets())statusNotif("Trening w toku",nx?"Następne: "+nx:"Wszystko odhaczone · zapisz trening",false)}
+function clearNotif(){if(NATIVE){try{NATIVE.clear()}catch(e){}return}if(!("serviceWorker" in navigator))return;navigator.serviceWorker.ready.then(r=>r.getNotifications({tag:"trening"})).then(ns=>ns.forEach(n=>n.close())).catch(()=>{})}
+function notifIdle(){const nx=nextUp();if(NATIVE&&draft&&draft.start&&draftHasSets()){try{NATIVE.status("Trening w toku",nx?"Następne: "+nx:"Wszystko odhaczone · zapisz trening")}catch(e){}return}if(draft&&draft.start&&draftHasSets())statusNotif("Trening w toku",nx?"Następne: "+nx:"Wszystko odhaczone · zapisz trening",false)}
 // ---------- Rest timer (countdown) ----------
 let restCfg=ls.get("rest-cfg",{}),restAt=null,restDur=0,restTick=null,restBeeped=false;
 const restFor=sl=>restCfg[sl.id]!=null?restCfg[sl.id]:(sl.rest||90);
 function roundDone(sl,i){if(!sl)return true;return sl.ex.every(ex=>{const it=draft.items[ex.key];if(!it||it.skip)return true;const n=setsFor(ex)+(it.plus||0);return i>=n||it.sets[i]!=null})}
 function slotOf(key){if(!draft||key[0]==="x")return null;for(const sl of plan(draft.type))if(sl.ex.some(e=>e.key===key))return sl;return null}
 function startRest(sec){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
-  restAt=Date.now();restDur=sec||90;restBeeped=false;drawRest.over=null;$("#rest").hidden=false;{const nx=nextUp();statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"Ostatnia seria za Tobą")+" · "+mmssR(restDur),false)}if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
-function stopRest(){const was=!!restAt;restAt=null;if(was)setTimeout(notifIdle,50);$("#rest").hidden=true;clearInterval(restTick);restTick=null;$("#rest").classList.remove("over")}
+  restAt=Date.now();restDur=sec||90;restBeeped=false;drawRest.over=null;$("#rest").hidden=false;{const nx=nextUp();if(NATIVE){try{NATIVE.restStart(restAt+restDur*1000,"Przerwa",nx?"Następne: "+nx:"Ostatnia seria za Tobą",prefs.snd!=="off",!!prefs.vib)}catch(e){}}else statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"Ostatnia seria za Tobą")+" · "+mmssR(restDur),false)}if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
+function stopRest(){const was=!!restAt;restAt=null;if(was&&NATIVE){try{NATIVE.restStop()}catch(e){}}if(was)setTimeout(notifIdle,50);$("#rest").hidden=true;clearInterval(restTick);restTick=null;$("#rest").classList.remove("over")}
 function drawRest(){if(!restAt)return;const left=restDur-(Date.now()-restAt)/1000,el=$("#rest");
   if(left<=3&&left>0&&Math.ceil(left)!==drawRest.last){drawRest.last=Math.ceil(left);beep(660,110)}
-  if(left<=0&&!restBeeped){restBeeped=true;const nx=nextUp();statusNotif("Czas na serię!",nx?"Teraz: "+nx:"Przerwa minęła",true)}
+  if(left<=0&&!restBeeped){restBeeped=true;const nx=nextUp();if(NATIVE){if(!document.hidden){try{NATIVE.restStop()}catch(e){}}}else statusNotif("Czas na serię!",nx?"Teraz: "+nx:"Przerwa minęła",true)}
+  if(NATIVE&&document.hidden)return;
   if(left<=0){const over=Math.floor(-left);if(drawRest.over!==over&&over<300){drawRest.over=over;beep(880,220);vib(220)}}else drawRest.over=null;
   el.classList.toggle("over",left<=0);
   $("#rest-l").textContent=left>0?"Przerwa":"Czas na serię · Stop wycisza";
   $("#rest-t").textContent=(left>0?"":"+")+mmssR(Math.abs(left))}
 function mmssR(x){x=Math.max(0,Math.ceil(x));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
 $("#rest-x").addEventListener("click",stopRest);
-function restNotifUpdate(){if(!restAt)return;const nx=nextUp();statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"")+"",false)}
+window.nativeStopped=()=>{if(restAt)stopRest()};
+function restNotifUpdate(){if(!restAt)return;const nx=nextUp();if(NATIVE){try{NATIVE.restStart(restAt+restDur*1000,"Przerwa",nx?"Następne: "+nx:"",prefs.snd!=="off",!!prefs.vib)}catch(e){}return}statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"")+"",false)}
 $("#rest-m").addEventListener("click",()=>{restDur=Math.max(0,restDur-15);restBeeped=false;drawRest();restNotifUpdate()});
 $("#rest-p").addEventListener("click",()=>{restDur+=15;restBeeped=false;drawRest();restNotifUpdate()});
 function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2400)}
@@ -528,9 +531,10 @@ function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
     <div class="chips">${[["off","Wyłączony"],["cicho","Cichy"],["glosno","Głośny"]].map(([k,l])=>`<button class="chip" data-snd="${k}" aria-pressed="${prefs.snd===k}">${l}</button>`).join("")}</div>
     <span class="ex-label">Wibracje</span>
     <div class="chips"><button class="chip" id="vib" aria-pressed="${prefs.vib}">${prefs.vib?"Włączone":"Wyłączone"}</button></div>
-    <span class="ex-label">Powiadomienie na pasku w trakcie treningu</span>
+    ${NATIVE?`<span class="ex-label">Powiadomienia</span><p class="hint">Obsługuje je aplikacja na Androida: licznik przerwy na pasku i alarm na koniec przerwy (dźwięk zgodnie z ustawieniem powyżej).</p></section>`:`<span class="ex-label">Powiadomienie na pasku w trakcie treningu</span>
     <div class="chips"><button class="chip" id="notif" aria-pressed="${prefs.notif&&"Notification" in window&&Notification.permission==="granted"}">${prefs.notif&&"Notification" in window&&Notification.permission==="granted"?"Włączone":"Wyłączone"}</button></div>
     <p class="hint">Pokazuje, do której jest przerwa i co robisz dalej. Po końcu przerwy przychodzi alert z wibracją, także gdy aplikacja jest w tle.</p></section>
+  <section class="card"><h2>Aplikacja na Androida</h2><p class="hint">Wersja z prawdziwym licznikiem przerwy na pasku i pewnym alarmem przy zablokowanym ekranie.</p><a class="ghost" style="text-align:center;text-decoration:none" href="https://github.com/sarroitor93-hash/Trening/releases/latest/download/Trening.apk">Pobierz Trening.apk</a></section>`}
   <button class="ghost" id="open-setup">Połączenie z arkuszem</button>
   <button class="primary" id="close-settings">Gotowe</button>`}
 function renderSetup(){return `<section class="card setup"><h2>Połącz z arkuszem</h2>
@@ -593,7 +597,7 @@ function renderTimerCard(){
    <div class="two"><button class="ghost" id="t-preset">Mój EMOM 24 min</button><button class="primary" id="t-start" ${tc.list.length?"":"disabled"}>▶ Start</button></div></section>`}
 let T=null,actx=null,wake=null;
 function beep(f,ms){try{if(!actx||prefs.snd==="off")return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(prefs.snd==="glosno"?.25:.04,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
-async function lockScreen(){try{if("wakeLock" in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
+async function lockScreen(){if(NATIVE){try{NATIVE.keepScreenOn(true)}catch(e){}}try{if("wakeLock" in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(T&&!T.done&&document.visibilityState==="visible")lockScreen()});
 function tStart(){
   try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
@@ -642,7 +646,7 @@ function tFill(){
   for(const id of extra){const h=HB[id],sec=/do końca interwału/.test(h.reps),r=sec?tc.work:(h.n||10);
     draft.extras.push({ex:h.name+(sec?" (sek.)":""),w:h.g==="k"||h.g==="c"?20:0,r,sets:Array(T.doneRounds).fill(r),plus:Math.max(0,T.doneRounds-3)})}
   delete draft.auto;saveDraft();tClose();toast("Odhaczone. Popraw liczby, jeśli trzeba, i zapisz trening.")}
-function tClose(){if(T&&T.h)clearInterval(T.h);try{wake&&wake.release()}catch(e){}wake=null;T=null;$("#timer").hidden=true;render()}
+function tClose(){if(NATIVE){try{NATIVE.keepScreenOn(false)}catch(e){}}if(T&&T.h)clearInterval(T.h);try{wake&&wake.release()}catch(e){}wake=null;T=null;$("#timer").hidden=true;render()}
 function timerClick(b){
   if(b.dataset.tmode){const m=TMODES[b.dataset.tmode];tc.mode=b.dataset.tmode;tc.work=m.work;tc.rest=m.rest;tc.rounds=m.rounds;saveTc();render();return true}
   if(b.dataset.tadd){tc.list.push(b.dataset.tadd);saveTc();render();return true}
