@@ -1,0 +1,7 @@
+name: probe
+on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "ANDROID_HOME=$ANDROID_HOME"; ls $ANDROID_HOME/build-tools | tail -3; ls $ANDROID_HOME/platforms | tail -3; java -version
