@@ -45,8 +45,8 @@ h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.02e
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 main{display:grid;gap:12px;padding-top:6px}
 .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.seg{display:inline-flex;background:var(--surface-2);border-radius:var(--r);padding:3px;gap:3px}
-.seg button{border:0;background:transparent;border-radius:7px;min-width:52px;padding:6px 12px;font-family:var(--display);font-weight:700;font-size:20px;color:var(--muted)}
+.seg{display:inline-flex;flex-wrap:wrap;background:var(--surface-2);border-radius:var(--r);padding:3px;gap:3px}
+.seg button{white-space:nowrap;border:0;background:transparent;border-radius:7px;min-width:44px;padding:6px 10px;font-family:var(--display);font-weight:700;font-size:20px;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
 .tog{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13px;color:var(--muted)}
 .tog[aria-pressed="true"]{border-color:var(--warn);background:var(--warn-bg);color:var(--warn);font-weight:600}
@@ -498,7 +498,7 @@ function exBlock(ex,it,key,n,dom,extra){
   const custom=!extra&&ex.opts&&!ex.opts.includes(it.ex);
   const chips=extra?"":`<div class="chips">${ex.opts.map(o=>`<button class="chip" data-ex="${key}" data-name="${esc(o)}" aria-pressed="${o===it.ex}">${esc(o)}</button>`).join("")}<button class="chip" data-other="${key}" aria-pressed="${custom||!!it.other}">Inne…</button></div>`;
   const nameIn=(extra||custom||it.other)?`<input class="name" list="all-ex" data-name-for="${key}" placeholder="Wpisz lub wybierz ćwiczenie" value="${esc(custom||extra?it.ex:"")}">`:"";
-  const head=extra?`<span class="ex-label">Dodatkowe</span>`:`<span class="ex-label">${esc(ex.label)}${ex.opts.length===1&&!custom?" · "+esc(it.ex):""}</span>`;
+  const head=extra?`<span class="ex-label">Dodatkowe</span>`:`<span class="ex-label">${esc(ex.label)}${ex.opts.length===1&&!custom&&it.ex!==ex.label?" · "+esc(it.ex):""}</span>`;
   return `<div class="ex"><div class="ex-top">${head}<span class="tools"><span class="target num">${n} × ${ex.lo===ex.hi?ex.lo:ex.lo+"–"+ex.hi}</span>
       <button class="mini" data-addset="${key}" aria-label="Dodaj serię">+ seria</button>
       <button class="mini" data-noteopen="${key}" aria-label="Notatka">✎</button>
@@ -639,8 +639,41 @@ function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="s
 
 
 
+
+// ---------- Szablony planów ----------
+const OHP=["Wyciskanie nad głowę – sztanga","Wyciskanie nad głowę – hantle","Wyciskanie nad głowę – maszyna"];
+const SQ=["Przysiad ze sztangą","Przysiad hack","Suwnica"],HINGE=["Martwy ciąg","RDL"],ROWB=["Wiosłowanie sztangą","Wiosłowanie hantlą","Wiosłowanie linką (dół)"];
+const PULLV=["Podciąganie","Ściąganie drążka / linki"],LUNGE=["Wykroki","Wykroki bułgarskie (na nogę)","Suwnica"],CALF=["Wznosy na łydki stojąc","Wznosy na łydki siedząc"];
+const RDLs=["RDL","Martwy ciąg"];
+function X(label,opts,sets,lo,hi,o){return Object.assign({key:rid("e"),label,opts:opts.slice(),def:0,sets,lo,hi,unit:"kg",step:2.5},o||{})}
+function BL(title,rule,rest,ex,f){f=f||{};return {id:rid("b"),title,rule,rest,min:!!f.min,nofail:!!f.nofail,ex}}
+const SIL=(t,ex)=>BL(t,"siła · 1–2 powt. zapasu, bez upadku",180,ex,{nofail:true,min:true});
+const ARMS2=()=>BL("Ramiona","superseria · do upadku",90,[X("Biceps",BIC,2,8,15,{step:1}),X("Triceps",TRI,2,8,15)]);
+const CORE=()=>BL("Brzuch (jeśli jest czas)","opcjonalnie",60,[X("Brzuch",ABS,2,10,20,{noProg:true})]);
+const TEMPLATES=[
+ {id:"fbw3",name:"FBW 3× (A/B/C)",desc:"Plan startowy aplikacji: całe ciało w każdej sesji, skoki, siła, superserie. 3 treningi w tygodniu, ok. 60 min.",build:()=>defaultPlan()},
+ {id:"fbw2",name:"FBW 2× (A/B)",desc:"Całe ciało, 2 treningi w tygodniu, ok. 50 min. Dobry start lub mało czasu.",build:()=>({note:"",sessions:[
+   {id:"A",name:"A",slots:[SIL("Przysiad",[X("Przysiad",SQ,3,5,8)]),BL("Klatka + plecy","superseria · 1 powt. zapasu",150,[X("Klatka",KLATKA,3,6,10),X("Plecy",ROWB,3,8,12)],{min:true}),BL("Tył uda + barki","superseria · do upadku",90,[X("Tył uda",UGIN,2,8,12),X("Barki",BOKI,2,10,15,{step:1})]),ARMS2()]},
+   {id:"B",name:"B",slots:[SIL("Zawias",[X("Zawias",HINGE,3,5,8)]),BL("Barki + plecy","superseria · 1 powt. zapasu",150,[X("Wyciskanie nad głowę",OHP,3,6,10),X("Plecy (pion)",PULLV,3,6,12)],{min:true}),BL("Nogi + tył barków","superseria · do upadku",90,[X("Nogi",LUNGE,2,8,12),X("Tył barków",TYL,2,12,20,{step:1})]),CORE()]}]})},
+ {id:"ud",name:"Góra / Dół (4×)",desc:"4 treningi w tygodniu: dwa na górę, dwa na dół. Dużo objętości, sesje ok. 60 min.",build:()=>({note:"",sessions:[
+   {id:"G1",name:"Góra A",slots:[SIL("Wyciskanie",[X("Klatka",["Wyciskanie sztangi – płasko","Wyciskanie hantli – płasko"],4,5,8)]),BL("Wiosłowanie","1 powt. zapasu",150,[X("Plecy",ROWB,4,6,10)],{min:true}),BL("Skos + pion","superseria",120,[X("Klatka (skos)",["Wyciskanie hantli – skos","Wyciskanie sztangi – skos"],3,8,12),X("Plecy (pion)",PULLV,3,8,12)]),BL("Barki + ramiona","superseria · do upadku",90,[X("Boki barków",BOKI,3,12,15,{step:1}),X("Biceps",BIC,2,10,15,{step:1}),X("Triceps",TRI,2,10,15)])]},
+   {id:"D1",name:"Dół A",slots:[SIL("Przysiad",[X("Przysiad",SQ,4,5,8)]),BL("Zawias","1–2 powt. zapasu",150,[X("Zawias",RDLs,3,6,10)],{min:true}),BL("Uda","superseria · do upadku",90,[X("Przód uda",PROST,3,10,15),X("Tył uda",UGIN,3,10,15)]),BL("Łydki + brzuch","superseria",60,[X("Łydki",CALF,3,10,15,{step:5}),X("Brzuch",ABS,2,10,20,{noProg:true})])]},
+   {id:"G2",name:"Góra B",slots:[SIL("Wyciskanie nad głowę",[X("Barki",OHP,4,5,8)]),BL("Podciąganie","1 powt. zapasu",150,[X("Plecy (pion)",PULLV,4,6,10)],{min:true}),BL("Klatka + plecy","superseria",120,[X("Klatka",KLATKA,3,8,12),X("Plecy",ROWB,3,8,12)]),BL("Tył barków + ramiona","superseria · do upadku",90,[X("Tył barków",TYL,3,12,20,{step:1}),X("Biceps",BIC,2,10,15,{step:1}),X("Triceps",TRI,2,10,15)])]},
+   {id:"D2",name:"Dół B",slots:[SIL("Martwy ciąg",[X("Martwy ciąg",["Martwy ciąg"],3,3,5)]),BL("Nogi","1–2 powt. zapasu",150,[X("Nogi",["Suwnica","Przysiad hack"],3,8,12)],{min:true}),BL("Wykroki + tył uda","superseria",90,[X("Wykroki",["Wykroki bułgarskie (na nogę)","Wykroki"],3,8,12),X("Tył uda",UGIN,3,10,15)]),BL("Łydki + brzuch","superseria",60,[X("Łydki",CALF,3,10,15,{step:5}),X("Brzuch",ABS,2,10,20,{noProg:true})])]}]})},
+ {id:"ppl",name:"Push / Pull / Nogi",desc:"3 różne sesje: wypychanie, przyciąganie, nogi. 3× w tygodniu albo 6× (dwa razy kolejka).",build:()=>({note:"",sessions:[
+   {id:"PU",name:"Push",slots:[SIL("Wyciskanie",[X("Klatka",["Wyciskanie sztangi – płasko","Wyciskanie hantli – płasko"],4,5,8)]),BL("Barki","1 powt. zapasu",150,[X("Wyciskanie nad głowę",OHP,3,8,12)],{min:true}),BL("Skos + boki","superseria",120,[X("Klatka (skos)",["Wyciskanie hantli – skos","Wyciskanie na maszynie"],3,8,12),X("Boki barków",BOKI,3,12,20,{step:1})]),BL("Triceps","do upadku",90,[X("Triceps",TRI,3,10,15)])]},
+   {id:"PL",name:"Pull",slots:[SIL("Wiosłowanie",[X("Plecy",ROWB,4,6,10)]),BL("Pion","1 powt. zapasu",150,[X("Plecy (pion)",PULLV,3,6,12)],{min:true}),BL("Plecy + tył barków","superseria",120,[X("Plecy",["Wiosłowanie linką (dół)","Wiosłowanie hantlą"],3,10,12),X("Tył barków",TYL,3,12,20,{step:1})]),BL("Biceps","do upadku",90,[X("Biceps",BIC,3,10,15,{step:1})])]},
+   {id:"LE",name:"Nogi",slots:[SIL("Przysiad",[X("Przysiad",SQ,4,5,8)]),BL("Zawias","1–2 powt. zapasu",150,[X("Zawias",RDLs,3,6,10)],{min:true}),BL("Uda","superseria · do upadku",90,[X("Przód uda",["Suwnica","Prostowanie nóg (maszyna)"],3,10,15),X("Tył uda",UGIN,3,10,15)]),BL("Łydki + brzuch","superseria",60,[X("Łydki",CALF,3,10,15,{step:5}),X("Brzuch",ABS,2,10,20,{noProg:true})])]}]})},
+ {id:"pp",name:"Push / Pull (z nogami)",desc:"2 sesje: wypychanie + przód nóg, przyciąganie + tył nóg. 2–4× w tygodniu.",build:()=>({note:"",sessions:[
+   {id:"PS",name:"Push",slots:[SIL("Przysiad",[X("Przysiad",SQ,3,5,8)]),BL("Wyciskanie","1 powt. zapasu",150,[X("Klatka",KLATKA,3,6,10)],{min:true}),BL("Barki","1 powt. zapasu",120,[X("Wyciskanie nad głowę",OHP,3,8,12)]),BL("Przód uda + boki","superseria · do upadku",90,[X("Przód uda",PROST,2,10,15),X("Boki barków",BOKI,2,12,15,{step:1})]),BL("Triceps","do upadku",90,[X("Triceps",TRI,2,10,15)])]},
+   {id:"PLL",name:"Pull",slots:[SIL("Martwy ciąg",[X("Martwy ciąg",["Martwy ciąg"],3,3,5)]),BL("Pion","1 powt. zapasu",150,[X("Plecy (pion)",PULLV,3,6,10)],{min:true}),BL("Wiosłowanie","1 powt. zapasu",120,[X("Plecy",ROWB,3,8,12)]),BL("Tył uda + tył barków","superseria · do upadku",90,[X("Tył uda",UGIN,2,10,15),X("Tył barków",TYL,2,12,20,{step:1})]),BL("Biceps","do upadku",90,[X("Biceps",BIC,2,10,15,{step:1})])]}]})},
+ {id:"s55",name:"Siła 5×5 (A/B)",desc:"Klasyczny plan siłowy na sztangę: 3 ćwiczenia, 5 serii po 5. 3× w tygodniu, na zmianę A i B.",build:()=>({note:"Ciężar dokładasz, gdy zrobisz wszystkie serie po 5.",sessions:[
+   {id:"SA",name:"5×5 A",slots:[SIL("Przysiad",[X("Przysiad",["Przysiad ze sztangą"],5,5,5)]),SIL("Wyciskanie",[X("Klatka",["Wyciskanie sztangi – płasko"],5,5,5)]),SIL("Wiosłowanie",[X("Plecy",["Wiosłowanie sztangą"],5,5,5)])]},
+   {id:"SB",name:"5×5 B",slots:[SIL("Przysiad",[X("Przysiad",["Przysiad ze sztangą"],5,5,5)]),SIL("Wyciskanie nad głowę",[X("Barki",["Wyciskanie nad głowę – sztanga"],5,5,5)]),SIL("Martwy ciąg",[X("Martwy ciąg",["Martwy ciąg"],1,5,5,{step:5})])]}]})}
+];
+
 // ---------- Edytor planu ----------
-let PE=null,peSid=null;
+let PE=null,peSid=null,peTplOpen=false;
 const UNITS=[["kg","kg"],["cm","cm (skoki)"],["sek","sekundy"],["bw","masa ciała"]];
 const rid=p=>p+Math.random().toString(36).slice(2,7);
 function peStart(){PE=JSON.parse(JSON.stringify(PLAN));peSid=(PE.sessions[0]||{}).id||null}
@@ -648,7 +681,9 @@ function peSession(){return PE.sessions.find(x=>x.id===peSid)}
 function unitOf(ex){return ex.unit==="cm"?"cm":ex.unitX==="sek"?"sek":ex.unitX==="bw"?"bw":"kg"}
 function renderPlanEditor(){
   if(!PE)peStart();const se=peSession();
-  let h=`<section class="card"><h2>Mój plan</h2><p class="hint">Sesje idą po kolei w kolejce. Blok z dwoma lub więcej ćwiczeniami to superseria. Zmiany zapisują się dopiero po „Zapisz plan”.</p>
+  let h=`<details class="card" ${peTplOpen?"open":""}><summary>Gotowe plany do wyboru</summary><p class="hint">Wybierz szablon, a potem dopasuj ćwiczenia poniżej. Nic się nie zmieni, dopóki nie klikniesz „Zapisz plan”.</p>
+    ${TEMPLATES.map(t=>`<button class="ghost" style="text-align:left" data-pe="tpl" data-id="${t.id}"><b>${esc(t.name)}</b><br><span class="hint">${esc(t.desc)}</span></button>`).join("")}</details>
+  <section class="card"><h2>Mój plan</h2><p class="hint">Sesje idą po kolei w kolejce. Blok z dwoma lub więcej ćwiczeniami to superseria. Zmiany zapisują się dopiero po „Zapisz plan”.</p>
     <span class="ex-label">Sesje</span><div class="chips" style="flex-wrap:wrap">${PE.sessions.map(x=>`<button class="chip" data-pe="sel" data-id="${esc(x.id)}" aria-pressed="${x.id===peSid}">${esc(x.name)}</button>`).join("")}<button class="chip" data-pe="addsess">+ Sesja</button></div>`;
   if(se){h+=`<div class="row"><input class="name" data-pf="name" value="${esc(se.name)}" placeholder="Nazwa sesji, np. A albo Góra"><button class="ghost" data-pe="delsess">Usuń sesję</button></div>
     <div class="two"><button class="ghost" data-pe="sessup">← Wcześniej w kolejce</button><button class="ghost" data-pe="sessdown">Później w kolejce →</button></div>`}
@@ -698,6 +733,7 @@ function peClick(b){const a=b.dataset.pe,se=peSession(),i=+b.dataset.i,j=+b.data
   else if(a==="exup")mv(se.slots[i].ex,j,-1);
   else if(a==="exdel"){if(se.slots[i].ex.length<=1){se.slots.splice(i,1)}else se.slots[i].ex.splice(j,1)}
   else if(a==="cancel"){PE=null;tab="settings";render();return}
+  else if(a==="tpl"){const t=TEMPLATES.find(x=>x.id===b.dataset.id);PE=t.build();PE.v=1;peSid=PE.sessions[0].id;peTplOpen=false;toast("Wczytano: "+t.name+". Dopasuj i zapisz.")}
   else if(a==="reset"){if(!b.dataset.ok){b.dataset.ok=1;b.textContent="Nadpisze Twój plan. Dotknij jeszcze raz";return}PE=defaultPlan();PE.note=GMODE()?"":IGOR_NOTE;peSid=PE.sessions[0].id}
   else if(a==="save"){
     for(const x of PE.sessions)for(const sl of x.slots){if(!sl.id)sl.id=rid("b");for(const ex of sl.ex){if(!ex.key)ex.key=rid("e");if(!ex.opts.length)ex.opts=["Ćwiczenie"]}}
