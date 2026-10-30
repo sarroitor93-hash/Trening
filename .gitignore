@@ -1,0 +1,2 @@
+android/app/*.keystore
+android/build.log
