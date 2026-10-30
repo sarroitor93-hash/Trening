@@ -224,11 +224,12 @@ const START={"Martwy ciąg":110,"Brzuszki na maszynie":20,"Spięcia na linie":20
 // ---------- Store: Google Sheet via Apps Script API (offline queue) ----------
 let entries=[];
 let cfg=ls.get("cfg",{url:"",key:""});
+const GMODE=()=>cfg.mode==="google";
 (function(){const m=location.hash.match(/k=([A-Za-z0-9_-]+)/);if(m){cfg.key=m[1];ls.set("cfg",cfg);history.replaceState(null,"",location.pathname)}})();
-const ready=()=>!!(cfg.url&&cfg.key);
+const ready=()=>GMODE()?!!cfg.email:!!(cfg.url&&cfg.key);
 function setSync(t,err){const el=$("#sync");el.textContent=t;el.classList.toggle("err",!!err)}
 const nz=v=>v===""||v==null?null:Number(v);
-const DEFAULT_GYM="Zdrofit Kłobucka";
+const DEFAULT_GYM=GMODE()?"":"Zdrofit Kłobucka";
 function build(d){
   const out=[], byId={};
   for(const r of d.gym||[]){
@@ -243,7 +244,7 @@ function build(d){
     if(r[17]!==""&&r[17]!=null)it.note=String(r[17]);
     e.items.push(it);
   }
-  for(const e of out) if(e.kind==="sila"&&!e.gym&&e.type!=="Dom"&&e.type!=="Hyrox") e.gym=DEFAULT_GYM;
+  if(DEFAULT_GYM) for(const e of out) if(e.kind==="sila"&&!e.gym&&e.type!=="Dom"&&e.type!=="Hyrox") e.gym=DEFAULT_GYM;
   for(const r of d.run||[]) out.push({id:String(r[5]),kind:"bieg",date:r[0],runType:String(r[1]),km:Number(r[2])||0,min:Number(r[3])||0,hr:nz(r[6])});
   for(const r of d.meas||[]) out.push({id:String(r[3]),kind:"pomiar",date:r[0],kg:Number(r[1])||0,waist:nz(r[2])});
   return out;
@@ -251,16 +252,75 @@ function build(d){
 const queue=()=>ls.get("queue",[]);
 function withQueue(list){const ids=new Set(list.map(e=>e.id));return list.concat(queue().filter(e=>!ids.has(e.id)))}
 function setEntries(list){entries=list.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));if(draft&&draft.auto&&!draftHasSets())draft=null;render()}
-function syncLabel(){const q=queue().length;if(!ready())return setSync("Nie połączono",true);if(!navigator.onLine)return setSync(q?"Offline · "+q+" w kolejce":"Offline",true);setSync(q?q+" czeka na wysłanie":"Arkusz Google · połączono",!!q)}
+function syncLabel(){const q=queue().length;if(!ready())return setSync("Nie połączono",true);if(GMODE()&&(needLogin||!gTokOk())){$("#sync").dataset.relogin="1";return setSync((q?q+" czeka · ":"")+"Dotknij, by zsynchronizować",true)}delete $("#sync").dataset.relogin;if(!navigator.onLine)return setSync(q?"Offline · "+q+" w kolejce":"Offline",true);setSync(q?q+" czeka na wysłanie":(GMODE()?"Twój arkusz · połączono":"Arkusz Google · połączono"),!!q)}
+// ---------- Google: logowanie i własny arkusz użytkownika (Sheets API, zakres drive.file) ----------
+const G_CLIENT="288637060767-m1c6nb6dv2mc0qo52o8fe3rcnfcg7ejr.apps.googleusercontent.com";
+const G_SCOPE="https://www.googleapis.com/auth/drive.file openid email";
+const GH={gym:["Data","Typ","Tryb","Slot","Ćwiczenie","Ciężar (kg)","Seria 1","Seria 2","Seria 3","Seria 4","Seria 5","Powt. razem","Objętość (kg×powt.)","Najlepsze e1RM (kg)","ID","Ciężary serii (kg)","Czas ćw. (min)","Notatka ćw.","Czas treningu (min)","Notatka treningu"],
+  run:["Data","Typ","Dystans (km)","Czas (min)","Tempo (min/km)","ID","Tętno śr. (bpm)"],meas:["Data","Masa (kg)","Talia (cm)","ID"]};
+const GN={gym:"Siłownia",run:"Bieg",meas:"Pomiary"},GC={gym:"T",run:"G",meas:"D"},GID={gym:15,run:6,meas:4};
+let gTok=ls.get("gtok",null),gClient=null,gWait=null;
+const gTokOk=()=>gTok&&gTok.exp>Date.now()+60000;
+function gLoad(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const sc=document.createElement("script");sc.src="https://accounts.google.com/gsi/client";sc.onload=()=>res();sc.onerror=()=>rej(new Error("gsi"));document.head.appendChild(sc)})}
+function gLogin(prompt){return gLoad().then(()=>new Promise((res,rej)=>{
+  gClient=google.accounts.oauth2.initTokenClient({client_id:G_CLIENT,scope:G_SCOPE,login_hint:cfg.email||undefined,callback:r=>{if(r.error)return rej(new Error(r.error));gTok={t:r.access_token,exp:Date.now()+(r.expires_in||3600)*1000};ls.set("gtok",gTok);res(gTok)},error_callback:e=>rej(new Error(e&&e.type||"popup"))});
+  gClient.requestAccessToken({prompt:prompt==null?"":prompt})}))}
+async function gFetch(url,opt){
+  if(!gTokOk())throw {auth:true};
+  opt=Object.assign({},opt||{});opt.headers=Object.assign({"Authorization":"Bearer "+gTok.t},opt.body?{"Content-Type":"application/json"}:{},opt.headers||{});
+  const r=await fetch(url,opt);if(r.status===401){gTok=null;ls.del("gtok");throw {auth:true}}
+  const j=r.status===204?{}:await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||("HTTP "+r.status));return j}
+const SH="https://sheets.googleapis.com/v4/spreadsheets/";
+async function gEmail(){const j=await gFetch("https://www.googleapis.com/oauth2/v3/userinfo");return j.email}
+async function gEnsureSheet(){
+  if(cfg.sheetId)return cfg.sheetId;
+  const q=encodeURIComponent("appProperties has { key='treningApp' and value='1' } and trashed=false");
+  const f=await gFetch("https://www.googleapis.com/drive/v3/files?q="+q+"&fields=files(id,name)&spaces=drive");
+  if(f.files&&f.files.length){cfg.sheetId=f.files[0].id;ls.set("cfg",cfg);return cfg.sheetId}
+  const c=await gFetch("https://sheets.googleapis.com/v4/spreadsheets",{method:"POST",body:JSON.stringify({properties:{title:"Dziennik treningowy (Trening)",locale:"pl_PL",timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Europe/Warsaw"},
+    sheets:["gym","run","meas"].map((k,i)=>({properties:{title:GN[k],index:i,gridProperties:{frozenRowCount:1}}}))})});
+  const id=c.spreadsheetId;
+  await gFetch(SH+id+"/values:batchUpdate",{method:"POST",body:JSON.stringify({valueInputOption:"RAW",data:["gym","run","meas"].map(k=>({range:GN[k]+"!A1",values:[GH[k]]}))})});
+  await gFetch("https://www.googleapis.com/drive/v3/files/"+id,{method:"PATCH",body:JSON.stringify({appProperties:{treningApp:"1"}})});
+  cfg.sheetId=id;ls.set("cfg",cfg);return id}
+const gDate=iso=>{const d=new Date(iso),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds())};
+function gRows(e){
+  const date=gDate(e.date);
+  if(e.kind==="bieg"){let pace="";if(e.km>0&&e.min>0){const p=e.min/e.km;let m=Math.floor(p),s=Math.round((p-m)*60);if(s===60){m++;s=0}pace=m+":"+String(s).padStart(2,"0")}return {k:"run",rows:[[date,e.runType,e.km,e.min,pace,e.id,e.hr||""]]}}
+  if(e.kind==="pomiar")return {k:"meas",rows:[[date,e.kg,e.waist==null?"":e.waist,e.id]]};
+  const dur=e.durMin?Math.round(e.durMin):"";
+  return {k:"gym",rows:(e.items||[]).map((it,idx)=>{const tail=(ws,t)=>[ws,t,it.note||"",dur,idx===0?(e.note||""):""];
+    if(it.mode==="time")return [date,e.type,e.minimum?"minimum":"pełny",it.key,it.ex,"","","","","","","","","",e.id].concat(tail("",Number(it.min)||""));
+    const s=(it.sets||[]).slice(0,5).map(x=>x==null?"":x);while(s.length<5)s.push("");
+    const base=Number(it.w)||0,ws=it.ws||[];let tot=0,vol=0,best=0,top=0;const wl=[];
+    s.forEach((r,i)=>{if(r==="")return;const w=ws[i]!=null&&ws[i]!==""?Number(ws[i]):base,n=Number(r);tot+=n;vol+=w*n;top=Math.max(top,w);wl.push(w);if(w>0)best=Math.max(best,w*(1+n/30))});
+    const varied=wl.some(w=>w!==wl[0]);
+    return [date,e.type,e.minimum?"minimum":"pełny",it.key,it.ex,top||base].concat(s).concat([tot,Math.round(vol*10)/10,best?Math.round(best*10)/10:"",e.id]).concat(tail(varied?wl.join("/"):"",""))})}}
+async function gIds(id,k){const j=await gFetch(SH+id+"/values/"+encodeURIComponent(GN[k]+"!"+String.fromCharCode(64+GID[k])+"2:"+String.fromCharCode(64+GID[k])));return (j.values||[]).map(r=>String(r[0]))}
+async function gSave(e){const id=await gEnsureSheet(),x=gRows(e);if(!x.rows.length)return;
+  if((await gIds(id,x.k)).includes(String(e.id)))return;
+  await gFetch(SH+id+"/values/"+encodeURIComponent(GN[x.k]+"!A1")+":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",{method:"POST",body:JSON.stringify({values:x.rows})})}
+async function gDelete(eid){const id=await gEnsureSheet();
+  const meta=await gFetch(SH+id+"?fields=sheets.properties(sheetId,title)");const sid={};for(const s of meta.sheets)sid[s.properties.title]=s.properties.sheetId;
+  const reqs=[];for(const k of ["gym","run","meas"]){const ids=await gIds(id,k);for(let i=ids.length-1;i>=0;i--)if(ids[i]===String(eid))reqs.push({deleteDimension:{range:{sheetId:sid[GN[k]],dimension:"ROWS",startIndex:i+1,endIndex:i+2}}})}
+  if(reqs.length)await gFetch(SH+id+":batchUpdate",{method:"POST",body:JSON.stringify({requests:reqs})})}
+async function gData(){const id=await gEnsureSheet();
+  const rs=["gym","run","meas"].map(k=>"ranges="+encodeURIComponent(GN[k]+"!A2:"+GC[k])).join("&");
+  const j=await gFetch(SH+id+"/values:batchGet?"+rs+"&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING");
+  const fix=r=>{r=r.slice();if(typeof r[0]==="string")r[0]=r[0].replace(" ","T");return r};
+  const v=j.valueRanges.map(x=>(x.values||[]).map(fix));return {gym:v[0],run:v[1],meas:v[2]}}
 async function api(body){
+  if(GMODE()){if(body.action==="save")await gSave(body.entry);else if(body.action==="delete")await gDelete(body.id);return {ok:true}}
   const r=await fetch(cfg.url,{method:"POST",body:JSON.stringify(Object.assign({key:cfg.key},body))});
   const j=await r.json(); if(!j.ok) throw new Error(j.error||"api"); return j;
 }
 let flushing=null;
 function flush(){if(!flushing)flushing=doFlush().finally(()=>{flushing=null});return flushing}
+let needLogin=false;
 async function doFlush(){
   let q=queue(); if(!q.length||!ready()||!navigator.onLine) return syncLabel();
-  for(const e of q.slice()){try{await api({action:"save",entry:e}); q=queue().filter(x=>x.id!==e.id); ls.set("queue",q)}catch(err){break}}
+  if(GMODE()&&!gTokOk()){needLogin=true;return syncLabel()}
+  for(const e of q.slice()){try{await api({action:"save",entry:e}); q=queue().filter(x=>x.id!==e.id); ls.set("queue",q)}catch(err){if(err&&err.auth)needLogin=true;break}}
   syncLabel();
 }
 async function load(){
@@ -268,11 +328,12 @@ async function load(){
   if(!ready()){syncLabel();return}
   await flush();
   try{
-    const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json();
-    if(!j.ok) throw new Error(j.error);
-    const list=build(j.data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list));
-  }catch(e){ setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
+    let data;
+    if(GMODE()) data=await gData();
+    else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
+    const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list));
+  }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
 async function oneTimeFixes(list){
@@ -330,13 +391,13 @@ function lastFor(exName){const g=draft&&draft.gym,list=strength().filter(e=>(e.i
   let e=list[0];if(g&&!freeWeight(exName)){const same=list.find(x=>x.gym===g),nog=list.find(x=>!x.gym);e=same||nog||list[0];const it=e.items.find(i=>i.ex===exName);return e.gym&&e.gym!==g?Object.assign({},it,{otherGym:e.gym}):it}
   return e.items.find(i=>i.ex===exName)}
 function regym(){if(!draft)return;for(const k in draft.items){const it=draft.items[k];if(it.sets.some(x=>x!=null))continue;const last=lastFor(it.ex);it.w=last?last.w:(it.ex in START?START[it.ex]:it.w)}}
-function gyms(){const s=new Set([DEFAULT_GYM]);for(const e of strength())if(e.gym)s.add(e.gym);for(const g of ls.get("gyms",[]))s.add(g);return [...s]}
+function gyms(){const s=new Set(DEFAULT_GYM?[DEFAULT_GYM]:[]);for(const e of strength())if(e.gym)s.add(e.gym);for(const g of ls.get("gyms",[]))s.add(g);return [...s]}
 function lastChoice(type,key){for(const e of strength()){if(e.type!==type)continue;const it=(e.items||[]).find(i=>i.key===key);if(it)return it.ex}return null}
 const e1rm=(w,r)=>r>0?w*(1+r/30):0;
 
 // ---------- Draft ----------
 let draft=ls.get("draft",null);
-function freshItem(ex,name){const last=lastFor(name);const w=last?last.w:(name in START?START[name]:0);return {ex:name,w:w,r:/sek\./.test(name)?45:/rundy/.test(name)?8:ex.hi,sets:Array(ex.sets).fill(null)}}
+function freshItem(ex,name){const last=lastFor(name);const w=last?last.w:(!GMODE()&&name in START?START[name]:0);return {ex:name,w:w,r:/sek\./.test(name)?45:/rundy/.test(name)?8:ex.hi,sets:Array(ex.sets).fill(null)}}
 function newDraft(type,minimum){
   const d={type,minimum:!!minimum,items:{}};
   for(const s of plan(type)) for(const ex of s.ex){const name=lastChoice(type,ex.key)||ex.opts[ex.def];d.items[ex.key]=freshItem(ex,ex.opts.includes(name)?name:ex.opts[ex.def])}
@@ -391,6 +452,7 @@ function drawRest(){if(!restAt)return;const left=restDur-(Date.now()-restAt)/100
   $("#rest-t").textContent=(left>0?"":"+")+mmssR(Math.abs(left))}
 function mmssR(x){x=Math.max(0,Math.ceil(x));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
 $("#rest-x").addEventListener("click",stopRest);
+$("#sync").addEventListener("click",async()=>{if(!$("#sync").dataset.relogin)return;try{await gLogin("");needLogin=false;await flush();await load()}catch(e){toast("Nie udało się połączyć z Google")}});
 window.nativeStopped=()=>{if(restAt)stopRest()};
 function restNotifUpdate(){if(!restAt)return;const nx=nextUp();if(NATIVE){try{NATIVE.restStart(restAt+restDur*1000,"Przerwa",nx?"Następne: "+nx:"",prefs.snd!=="off",!!prefs.vib)}catch(e){}return}statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"")+"",false)}
 $("#rest-m").addEventListener("click",()=>{restDur=Math.max(0,restDur-15);restBeeped=false;drawRest();restNotifUpdate()});
@@ -438,7 +500,7 @@ function renderSila(){
     ${["A","B","C","Dom"].map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
     ${dom?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">Tryb minimum</button>`}</div>
     <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka A → B → C idzie dalej.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+nextType()+"</b>. Kolejka A → B → C, niezależnie od dnia. Dzień po dniu: nie rób C po A ani A po C (dwa razy zawias)."}</p>`;
-  if(!dom){const G=gyms();if(draft.gym===undefined||draft.gym===""){draft.gym=DEFAULT_GYM;regym();saveDraft()}
+  if(!dom){const G=gyms();if(DEFAULT_GYM&&(draft.gym===undefined||draft.gym==="")){draft.gym=DEFAULT_GYM;regym();saveDraft()}
     h+=`<div class="chips">${G.map(g=>`<button class="chip" data-gym="${esc(g)}" aria-pressed="${draft.gym===g}">${esc(g)}</button>`).join("")}<button class="chip" id="gym-add">+ Siłownia</button></div>${draft.gymNew?`<div class="row"><input class="name" id="gym-new" placeholder="Nazwa siłowni, np. Zdrofit Pruszków"><button class="ghost" id="gym-ok">Dodaj</button></div>`:""}`}
   if(draft.editId) h+=`<p class="hint" style="color:var(--warn);font-weight:600">Edycja treningu z ${new Date(draft.editDate).toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})}. Nowe serie: ustaw powtórzenia i dotknij kwadratu.</p>`;
   if(draft.start&&draftHasSets()&&!draft.editId) h+=`<p class="hint num">Trening trwa: <b>${mmssR((Date.now()-draft.start)/1000)}</b> (od pierwszej serii)</p>`;
@@ -500,7 +562,7 @@ function weekStats(){
     <p class="hint">Cel redukcji: ok. 0,3–0,5 kg tygodniowo w średniej. Pojedynczy dzień nic nie znaczy.</p></section>`}
 function renderPomiar(){
   const lastM=entries.find(e=>e.kind==="pomiar");
-  const f=ls.get("pom-form",{kg:lastM?lastM.kg:80.6,waist:lastM?lastM.waist:84});
+  const f=ls.get("pom-form",{kg:lastM?lastM.kg:(GMODE()?75:80.6),waist:lastM?lastM.waist:(GMODE()?null:84)});
   return `<section class="card"><h2>Pomiar</h2>
     <p class="hint">Waga codziennie rano, na czczo, po toalecie. Talia raz w tygodniu, na wysokości pępka, na wydechu. Pole talii po zapisie się czyści, w dzień pomiaru talii dotknij +.</p>
     <div class="two">${stepper("kg",f.kg,"masa · kg")}${stepper("waist",f.waist,"talia · cm")}</div>
@@ -547,11 +609,15 @@ function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
   <section class="card"><h2>Aplikacja na Androida</h2><p class="hint">Wersja z prawdziwym licznikiem przerwy na pasku i pewnym alarmem przy zablokowanym ekranie.</p><a class="ghost" style="text-align:center;text-decoration:none" href="https://github.com/sarroitor93-hash/Trening/releases/latest/download/Trening.apk">Pobierz Trening.apk</a></section>`}
   <button class="ghost" id="open-setup">Połączenie z arkuszem</button>
   <button class="primary" id="close-settings">Gotowe</button>`}
-function renderSetup(){return `<section class="card setup"><h2>Połącz z arkuszem</h2>
+function renderSetup(){return `<section class="card setup"><h2>Zaloguj się</h2>
+  <p class="hint">Aplikacja utworzy na Twoim Dysku Google arkusz „Dziennik treningowy (Trening)” i będzie w nim zapisywać treningi, biegi i pomiary. Ma dostęp tylko do tego jednego pliku.</p>
+  <button class="primary" id="g-login">Zaloguj przez Google</button>
+  ${cfg.email?`<p class="hint">Zalogowano: ${esc(cfg.email)} · <button class="del" id="g-logout">Wyloguj</button></p>`:""}</section>
+  <details class="card"><summary>Zaawansowane: własny skrypt</summary><div class="setup" style="margin-top:10px">
   <p class="hint">Jednorazowo. Wklej adres skryptu Google (kończy się na /exec). Klucz dostępu jest już wpisany, jeśli otworzyłeś link od trenera.</p>
   <label for="cfg-url">Adres skryptu</label><input id="cfg-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url)}">
   <label for="cfg-key">Klucz dostępu</label><input id="cfg-key" placeholder="klucz" value="${esc(cfg.key)}">
-  <button class="primary" id="cfg-save">Połącz</button></section>`}
+  <button class="primary" id="cfg-save">Połącz</button></div></details>`}
 function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="setup"?renderSetup():tab==="settings"?renderSettings():tab==="sila"?renderSila():tab==="bieg"?renderBieg():tab==="pomiar"?renderPomiar():renderHist();window.scrollTo(0,y)}
 
 
@@ -676,7 +742,7 @@ function timerClick(b){
 function findEx(key){if(key[0]==="x")return XEX;for(const s of plan(draft.type)) for(const ex of s.ex) if(ex.key===key) return ex}
 function itemOf(key){return key[0]==="x"?draft.extras[+key.slice(1)]:draft.items[key]}
 const bf=()=>ls.get("bieg-form",{t:"Spokojny",km:8,min:48});
-const pf=()=>{const lastM=entries.find(e=>e.kind==="pomiar");return ls.get("pom-form",{kg:lastM?lastM.kg:80.6,waist:lastM?lastM.waist:84})};
+const pf=()=>{const lastM=entries.find(e=>e.kind==="pomiar");return ls.get("pom-form",{kg:lastM?lastM.kg:(GMODE()?75:80.6),waist:lastM?lastM.waist:(GMODE()?null:84)})};
 function bump(id,dir){
   if(id.startsWith("t-")){const f=id.slice(2),st=f==="rounds"?1:f==="work"&&tc.mode==="emom"?15:5;tc[f]=Math.max(f==="rest"?0:1,(tc[f]||0)+dir*st);saveTc();render();return}
   if(tab==="sila"&&id.startsWith("m-")){const it=itemOf(id.slice(2));it.min=Math.max(0,(it.min||0)+dir);saveDraft();render();return}
@@ -692,11 +758,19 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.rdec||b.dataset.rinc){const id=b.dataset.rdec||b.dataset.rinc,sl=plan(draft.type).find(x=>x.id===id);restCfg[id]=Math.max(15,restFor(sl)+(b.dataset.rinc?15:-15));ls.set("rest-cfg",restCfg);render();return}
   if(b.dataset.rgo){const sl=plan(draft.type).find(x=>x.id===b.dataset.rgo);startRest(restFor(sl));return}
   if(b.id==="open-setup"){tab="setup";render();return}
+  if(b.id==="g-login"){if(NATIVE){toast("Logowanie Google działa na razie w wersji z Chrome, nie w aplikacji na Androida.");return}
+    b.disabled=true;b.textContent="Łączę…";
+    try{await gLogin("select_account");const email=await gEmail();const prev=cfg;cfg={mode:"google",email:email};if(prev.mode==="google"&&prev.email===email&&prev.sheetId)cfg.sheetId=prev.sheetId;ls.set("cfg",cfg);
+      if(prev.mode!=="google"||prev.email!==email){ls.del("cache");ls.del("queue");ls.del("draft");draft=null}
+      await gEnsureSheet();needLogin=false;tab="sila";toast("Połączono z Twoim arkuszem");location.reload()}
+    catch(e){toast("Nie udało się zalogować"+(e&&e.message?": "+e.message:""));b.disabled=false;b.textContent="Zaloguj przez Google"}
+    return}
+  if(b.id==="g-logout"){ls.del("gtok");ls.del("cache");ls.del("queue");ls.del("draft");ls.set("cfg",{url:"",key:""});location.reload();return}
   if(b.id==="open-settings"){prevTab=tab==="settings"?prevTab:tab;tab="settings";document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected","false"));render();return}
   if(b.id==="close-settings"){tab=prevTab||"sila";document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===tab));render();return}
   if(b.id==="cfg-save"){const u=$("#cfg-url").value.trim(),k=$("#cfg-key").value.trim(); if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){toast("Adres musi zaczynać się od https://script.google.com i kończyć na /exec");return}
     b.disabled=true;b.textContent="Sprawdzam…";
-    try{const r=await fetch(u+"?action=data&key="+encodeURIComponent(k));const j=await r.json();if(!j.ok)throw new Error(j.error);cfg={url:u,key:k};ls.set("cfg",cfg);tab="sila";toast("Połączono z arkuszem");load()}
+    try{const r=await fetch(u+"?action=data&key="+encodeURIComponent(k));const j=await r.json();if(!j.ok)throw new Error(j.error);cfg={url:u,key:k,mode:"script"};ls.set("cfg",cfg);tab="sila";toast("Połączono z arkuszem");load()}
     catch(e){toast(String(e&&e.message)==="key"?"Zły klucz dostępu":"Nie udało się połączyć. Sprawdź adres i wdrożenie (dostęp: Każdy).");b.disabled=false;b.textContent="Połącz"}
     return}
   if(b.dataset.inc) return bump(b.dataset.inc,1);
