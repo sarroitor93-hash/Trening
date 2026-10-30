@@ -25,7 +25,7 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.4;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:env(safe-area-inset-top,0px) 96px}
 .wrap{max-width:560px;margin:0 auto}
-button,input{font:inherit;color:inherit}
+button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 [hidden]{display:none!important}
@@ -190,7 +190,7 @@ const ALL=[...new Set(["Rozpiętki (maszyna)","Martwy ciąg","RDL","Przysiad hac
 function arms(){return {id:"ramiona",rest:90,title:"4 · Biceps + triceps",rule:"superseria · do upadku",min:false,
      ex:[{key:"biceps",label:"Biceps",opts:BIC,def:0,sets:2,lo:8,hi:15,unit:"kg",step:1},
          {key:"triceps",label:"Triceps",opts:TRI,def:1,sets:2,lo:8,hi:15,unit:"kg",step:2.5}]}}
-function plan(type){
+function legacyPlan(type){
   if(type==="Dom") return [
     {id:"dom",title:"Dom · EMOM 24 min",rule:"4 rundy × 6 min · reszta minuty = odpoczynek",
      ex:[{key:"swing",label:"Min 1",opts:["Swingi"],def:0,sets:4,lo:20,hi:20,unit:"kg",step:4,noProg:true},
@@ -218,6 +218,12 @@ function plan(type){
      ex:[{key:"brzuch",label:"Brzuch",opts:ABS,def:0,sets:2,lo:10,hi:20,unit:"kg",step:2.5,noProg:true}]}
   ];
 }
+// ---------- Plan jako dane (edytowalny) ----------
+const IGOR_NOTE="Dzień po dniu: nie rób C po A ani A po C (dwa razy zawias).";
+function defaultPlan(){return {v:1,note:GMODE()?"":IGOR_NOTE,sessions:["A","B","C"].map(id=>({id,name:id,slots:JSON.parse(JSON.stringify(legacyPlan(id)))}))}}
+function plan(type){if(type==="Dom")return legacyPlan("Dom");const se=PLAN.sessions.find(x=>x.id===type);return se?se.slots:[]}
+const sessionIds=()=>PLAN.sessions.map(x=>x.id);
+const sessionName=id=>{const se=PLAN.sessions.find(x=>x.id===id);return se?se.name:id};
 const START={"Martwy ciąg":110,"Brzuszki na maszynie":20,"Spięcia na linie":20,"Deska (sek.)":0,"Tabata brzuch (rundy)":0,"Wyciskanie hantli – skos":27.5,"Suwnica":150,"Podciąganie":0,"Wskok na skrzynię":60,"Skok w dal":220,"RDL":80,"Prostowanie nóg (maszyna)":50,"Uginanie nóg siedząc (maszyna)":40,
   "Swingi":20,"Wykroki bułgarskie (na nogę)":20,"Wiosłowanie kettlem (na stronę)":20,"Wyciskanie kettla nad głowę (na stronę)":20,"Push press (na stronę)":20,"Pompki":0,"Pompki – nogi wyżej":0};
 
@@ -225,6 +231,7 @@ const START={"Martwy ciąg":110,"Brzuszki na maszynie":20,"Spięcia na linie":20
 let entries=[];
 let cfg=ls.get("cfg",{url:"",key:""});
 const GMODE=()=>cfg.mode==="google";
+let PLAN=ls.get("plan",null)||defaultPlan();
 (function(){const m=location.hash.match(/k=([A-Za-z0-9_-]+)/);if(m){cfg.key=m[1];ls.set("cfg",cfg);history.replaceState(null,"",location.pathname)}})();
 const ready=()=>GMODE()?!!cfg.email:!!(cfg.url&&cfg.key);
 function setSync(t,err){const el=$("#sync");el.textContent=t;el.classList.toggle("err",!!err)}
@@ -309,6 +316,11 @@ async function gData(){const id=await gEnsureSheet();
   const j=await gFetch(SH+id+"/values:batchGet?"+rs+"&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING");
   const fix=r=>{r=r.slice();if(typeof r[0]==="string")r[0]=r[0].replace(" ","T");return r};
   const v=j.valueRanges.map(x=>(x.values||[]).map(fix));return {gym:v[0],run:v[1],meas:v[2]}}
+async function gPlanTab(id){const meta=await gFetch(SH+id+"?fields=sheets.properties(sheetId,title)");if(!meta.sheets.some(x=>x.properties.title==="Plan"))await gFetch(SH+id+":batchUpdate",{method:"POST",body:JSON.stringify({requests:[{addSheet:{properties:{title:"Plan"}}}]})})}
+async function gSavePlan(p){const id=await gEnsureSheet();await gPlanTab(id);const js=JSON.stringify(p),ch=[];for(let i=0;i<js.length;i+=40000)ch.push([js.slice(i,i+40000)]);
+  await gFetch(SH+id+"/values/"+encodeURIComponent("Plan!A1:A200")+":clear",{method:"POST",body:"{}"});
+  await gFetch(SH+id+"/values/"+encodeURIComponent("Plan!A1:A"+ch.length)+"?valueInputOption=RAW",{method:"PUT",body:JSON.stringify({values:ch})})}
+async function gLoadPlan(){const id=await gEnsureSheet();try{const j=await gFetch(SH+id+"/values/"+encodeURIComponent("Plan!A1:A200"));const js=(j.values||[]).map(r=>r[0]).join("");return js?JSON.parse(js):null}catch(e){if(e&&e.auth)throw e;return null}}
 async function api(body){
   if(GMODE()){if(body.action==="save")await gSave(body.entry);else if(body.action==="delete")await gDelete(body.id);return {ok:true}}
   const r=await fetch(cfg.url,{method:"POST",body:JSON.stringify(Object.assign({key:cfg.key},body))});
@@ -329,7 +341,7 @@ async function load(){
   await flush();
   try{
     let data;
-    if(GMODE()) data=await gData();
+    if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
     if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list));
@@ -385,7 +397,7 @@ window.addEventListener("offline",syncLabel);
 
 // ---------- Derived from history ----------
 const strength=()=>entries.filter(e=>e.kind==="sila");
-function nextType(){const s=strength().find(e=>["A","B","C"].includes(e.type));return s?({A:"B",B:"C",C:"A"})[s.type]:"A"}
+function nextType(){const ids=sessionIds();if(!ids.length)return "Dom";const s=strength().find(e=>ids.includes(e.type));return s?ids[(ids.indexOf(s.type)+1)%ids.length]:ids[0]}
 const freeWeight=n=>/hantl|sztang|Martwy ciąg|RDL|kettl|Swing|Pompk|Podciąg|Wskok|Skok|bułgarsk|Push press|Kółko|Deska/i.test(n);
 function lastFor(exName){const g=draft&&draft.gym,list=strength().filter(e=>(e.items||[]).some(i=>i.ex===exName));if(!list.length)return null;
   let e=list[0];if(g&&!freeWeight(exName)){const same=list.find(x=>x.gym===g),nog=list.find(x=>!x.gym);e=same||nog||list[0];const it=e.items.find(i=>i.ex===exName);return e.gym&&e.gym!==g?Object.assign({},it,{otherGym:e.gym}):it}
@@ -464,7 +476,7 @@ let tab="sila",prevTab="sila";
 document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{tab=b.dataset.tab;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));render()}));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function stepper(id,val,unit){return `<div><div class="stepper"><button data-dec="${id}" aria-label="mniej">−</button><input id="${id}" class="num" inputmode="decimal" value="${val==null?"":fmt(val)}" placeholder="—"><button data-inc="${id}" aria-label="więcej">+</button></div><span class="unit">${unit}</span></div>`}
-function unitLabel(ex,it){ if(ex.unit==="cm") return "cm (skrzynia / skok)"; if(BW.includes(it.ex)) return "kg dodatkowo"; return "kg" }
+function unitLabel(ex,it){ if(ex.unit==="cm") return "cm (skrzynia / skok)"; if(ex.unitX==="bw") return "kg dodatkowo"; if(BW.includes(it.ex)) return "kg dodatkowo"; return "kg" }
 
 function noteBlock(key,it){return it.noteOpen||it.note?`<input class="name" data-note-for="${key}" placeholder="Notatka, np. inny sprzęt, ból, technika" value="${esc(it.note||"")}">`:""}
 function timeBlock(it,key){
@@ -488,7 +500,7 @@ function exBlock(ex,it,key,n,dom,extra){
       <button class="mini" data-noteopen="${key}" aria-label="Notatka">✎</button>
       <button class="mini" data-skip="${key}">${extra?"Usuń":"Pomiń"}</button></span></div>
     ${chips}${nameIn}${noteBlock(key,it)}
-    <div class="row">${stepper("w-"+key,it.w,unitLabel(ex,it))}<div class="reps">${stepper("r-"+key,it.r,repUnit(it.ex))}</div></div>
+    <div class="row">${stepper("w-"+key,it.w,unitLabel(ex,it))}<div class="reps">${stepper("r-"+key,it.r,ex.unitX==="sek"?"sek.":repUnit(it.ex))}</div></div>
     <div class="sets">${it.sets.slice(0,n).map((v,i)=>`<button class="set num ${v!=null?"on":""}" data-set="${key}" data-i="${i}" aria-label="${dom?"Runda":"Seria"} ${i+1}">${v!=null?`${v}${ex.unit==="kg"&&it.ws&&it.ws[i]!=null?`<small>${fmt(it.ws[i])}</small>`:""}`:"·"}</button>`).join("")}</div>
     <div class="meta num"><span>${lastTxt}</span>${up?`<span class="up">↑ dołóż ${fmt(ex.step)} kg</span>`:""}</div></div>`;
 }
@@ -497,9 +509,9 @@ function renderSila(){
   if(!draft.extras) draft.extras=[];
   const P=plan(draft.type), dom=draft.type==="Dom", c=draft.type==="C";
   let h=`<div class="bar"><div class="seg" role="group" aria-label="Sesja">
-    ${["A","B","C","Dom"].map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
+    ${[...sessionIds(),"Dom"].map(t=>`<button data-type="${esc(t)}" aria-pressed="${draft.type===t}">${esc(t==="Dom"?"Dom":sessionName(t))}</button>`).join("")}</div>
     ${dom?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">Tryb minimum</button>`}</div>
-    <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka A → B → C idzie dalej.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+nextType()+"</b>. Kolejka A → B → C, niezależnie od dnia. Dzień po dniu: nie rób C po A ani A po C (dwa razy zawias)."}</p>`;
+    <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka sesji idzie dalej.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+esc(sessionName(nextType()))+"</b>. Kolejka: "+sessionIds().map(sessionName).map(esc).join(" → ")+", niezależnie od dnia. "+esc(PLAN.note||"")}</p>`;
   if(!dom){const G=gyms();if(DEFAULT_GYM&&(draft.gym===undefined||draft.gym==="")){draft.gym=DEFAULT_GYM;regym();saveDraft()}
     h+=`<div class="chips">${G.map(g=>`<button class="chip" data-gym="${esc(g)}" aria-pressed="${draft.gym===g}">${esc(g)}</button>`).join("")}<button class="chip" id="gym-add">+ Siłownia</button></div>${draft.gymNew?`<div class="row"><input class="name" id="gym-new" placeholder="Nazwa siłowni, np. Zdrofit Pruszków"><button class="ghost" id="gym-ok">Dodaj</button></div>`:""}`}
   if(draft.editId) h+=`<p class="hint" style="color:var(--warn);font-weight:600">Edycja treningu z ${new Date(draft.editDate).toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})}. Nowe serie: ustaw powtórzenia i dotknij kwadratu.</p>`;
@@ -607,6 +619,7 @@ function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
     <div class="chips"><button class="chip" id="notif" aria-pressed="${prefs.notif&&"Notification" in window&&Notification.permission==="granted"}">${prefs.notif&&"Notification" in window&&Notification.permission==="granted"?"Włączone":"Wyłączone"}</button></div>
     <p class="hint">Pokazuje, do której jest przerwa i co robisz dalej. Po końcu przerwy przychodzi alert z wibracją, także gdy aplikacja jest w tle.</p></section>
   <section class="card"><h2>Aplikacja na Androida</h2><p class="hint">Wersja z prawdziwym licznikiem przerwy na pasku i pewnym alarmem przy zablokowanym ekranie.</p><a class="ghost" style="text-align:center;text-decoration:none" href="https://github.com/sarroitor93-hash/Trening/releases/latest/download/Trening.apk">Pobierz Trening.apk</a></section>`}
+  <button class="ghost" id="open-plan">Mój plan: sesje i ćwiczenia</button>
   <button class="ghost" id="open-setup">Połączenie z arkuszem</button>
   <button class="primary" id="close-settings">Gotowe</button>`}
 function renderSetup(){return `<section class="card setup"><h2>Zaloguj się</h2>
@@ -618,8 +631,77 @@ function renderSetup(){return `<section class="card setup"><h2>Zaloguj się</h2>
   <label for="cfg-url">Adres skryptu</label><input id="cfg-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url)}">
   <label for="cfg-key">Klucz dostępu</label><input id="cfg-key" placeholder="klucz" value="${esc(cfg.key)}">
   <button class="primary" id="cfg-save">Połącz</button></div></details>`}
-function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="setup"?renderSetup():tab==="settings"?renderSettings():tab==="sila"?renderSila():tab==="bieg"?renderBieg():tab==="pomiar"?renderPomiar():renderHist();window.scrollTo(0,y)}
+function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="setup"?renderSetup():tab==="settings"?renderSettings():tab==="planed"?renderPlanEditor():tab==="sila"?renderSila():tab==="bieg"?renderBieg():tab==="pomiar"?renderPomiar():renderHist();window.scrollTo(0,y)}
 
+
+
+// ---------- Edytor planu ----------
+let PE=null,peSid=null;
+const UNITS=[["kg","kg"],["cm","cm (skoki)"],["sek","sekundy"],["bw","masa ciała"]];
+const rid=p=>p+Math.random().toString(36).slice(2,7);
+function peStart(){PE=JSON.parse(JSON.stringify(PLAN));peSid=(PE.sessions[0]||{}).id||null}
+function peSession(){return PE.sessions.find(x=>x.id===peSid)}
+function unitOf(ex){return ex.unit==="cm"?"cm":ex.unitX==="sek"?"sek":ex.unitX==="bw"?"bw":"kg"}
+function renderPlanEditor(){
+  if(!PE)peStart();const se=peSession();
+  let h=`<section class="card"><h2>Mój plan</h2><p class="hint">Sesje idą po kolei w kolejce. Blok z dwoma lub więcej ćwiczeniami to superseria. Zmiany zapisują się dopiero po „Zapisz plan”.</p>
+    <span class="ex-label">Sesje</span><div class="chips" style="flex-wrap:wrap">${PE.sessions.map(x=>`<button class="chip" data-pe="sel" data-id="${esc(x.id)}" aria-pressed="${x.id===peSid}">${esc(x.name)}</button>`).join("")}<button class="chip" data-pe="addsess">+ Sesja</button></div>`;
+  if(se){h+=`<div class="row"><input class="name" data-pf="name" value="${esc(se.name)}" placeholder="Nazwa sesji, np. A albo Góra"><button class="ghost" data-pe="delsess">Usuń sesję</button></div>
+    <div class="two"><button class="ghost" data-pe="sessup">← Wcześniej w kolejce</button><button class="ghost" data-pe="sessdown">Później w kolejce →</button></div>`}
+  h+=`<span class="ex-label">Notatka pod kolejką</span><input class="name" data-pf="note" value="${esc(PE.note||"")}" placeholder="np. nie rób dwóch sesji z martwym ciągiem dzień po dniu"></section>`;
+  if(se){se.slots.forEach((sl,i)=>{
+    h+=`<section class="slot"><div class="slot-h"><h2>Blok ${i+1}</h2><span class="tools"><button class="mini" data-pe="slup" data-i="${i}">↑</button><button class="mini" data-pe="sldown" data-i="${i}">↓</button><button class="mini" data-pe="sldel" data-i="${i}">Usuń blok</button></span></div>
+      <input class="name" data-pf="s.${i}.title" value="${esc(sl.title||"")}" placeholder="Nazwa bloku, np. Klatka + plecy">
+      <input class="name" data-pf="s.${i}.rule" value="${esc(sl.rule||"")}" placeholder="Opis, np. superseria · 1 RIR">
+      <div class="two">${pnum(`s.${i}.rest`,sl.rest||90,"przerwa · sek.")}<div style="display:grid;gap:6px;align-content:center">
+        <label class="hint"><input type="checkbox" data-pf="s.${i}.nofail" ${sl.nofail?"checked":""}> blok siłowy (bez upadku)</label>
+        <label class="hint"><input type="checkbox" data-pf="s.${i}.min" ${sl.min?"checked":""}> zostaje w trybie minimum</label></div></div>`;
+    sl.ex.forEach((ex,j)=>{const u=unitOf(ex);
+      h+=`<div class="ex"><div class="ex-top"><span class="ex-label">Ćwiczenie ${j+1}</span><span class="tools"><button class="mini" data-pe="exup" data-i="${i}" data-j="${j}">↑</button><button class="mini" data-pe="exdel" data-i="${i}" data-j="${j}">Usuń</button></span></div>
+        <input class="name" data-pf="e.${i}.${j}.label" value="${esc(ex.label||"")}" placeholder="Etykieta, np. Klatka">
+        <textarea class="name" rows="${Math.max(2,ex.opts.length)}" data-pf="e.${i}.${j}.opts" placeholder="Warianty, każdy w nowej linii. Pierwszy = domyślny.">${esc([ex.opts[ex.def||0],...ex.opts.filter((o,k)=>k!==(ex.def||0))].join("\n"))}</textarea>
+        <div class="stats">${pnum(`e.${i}.${j}.sets`,ex.sets,"serie")}${pnum(`e.${i}.${j}.lo`,ex.lo,"powt. od")}${pnum(`e.${i}.${j}.hi`,ex.hi,"powt. do")}</div>
+        <div class="two"><select class="name" data-pf="e.${i}.${j}.unit">${UNITS.map(([k,l])=>`<option value="${k}" ${u===k?"selected":""}>${l}</option>`).join("")}</select>${pnum(`e.${i}.${j}.step`,ex.step||2.5,"skok ciężaru")}</div>
+        <label class="hint"><input type="checkbox" data-pf="e.${i}.${j}.noProg" ${ex.noProg?"checked":""}> bez podpowiedzi „dołóż ciężar”</label></div>`});
+    h+=`<button class="ghost" data-pe="exadd" data-i="${i}">+ Ćwiczenie w tym bloku${sl.ex.length?" (superseria)":""}</button></section>`});
+    h+=`<button class="ghost" data-pe="sladd">+ Blok</button>`}
+  h+=`<datalist id="all-ex">${ALL.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+    <button class="primary" data-pe="save">Zapisz plan</button>
+    <div class="two"><button class="ghost" data-pe="cancel">Anuluj zmiany</button><button class="ghost" data-pe="reset">Plan startowy (FBW A/B/C)</button></div>`;
+  return h}
+function pnum(path,v,label){return `<div><input class="name num" style="text-align:center" inputmode="decimal" data-pf="${path}" value="${v==null?"":fmt(v)}"><span class="unit">${label}</span></div>`}
+function peField(path,el){const se=peSession(),a=path.split(".");
+  const val=el.type==="checkbox"?el.checked:el.value;
+  if(a[0]==="name"){if(se)se.name=String(val).trim()||se.id;return}
+  if(a[0]==="note"){PE.note=String(val);return}
+  if(a[0]==="s"){const sl=se.slots[+a[1]],f=a[2];if(f==="rest")sl.rest=Math.max(15,parse(val)||90);else sl[f]=val;return}
+  if(a[0]==="e"){const ex=se.slots[+a[1]].ex[+a[2]],f=a[3];
+    if(f==="opts"){const L=String(val).split("\n").map(x=>x.trim()).filter(Boolean);ex.opts=L.length?L:["Ćwiczenie"];ex.def=0;return}
+    if(f==="unit"){delete ex.unitX;if(val==="cm"){ex.unit="cm";ex.noProg=true}else{ex.unit="kg";if(val!=="kg")ex.unitX=val}return}
+    if(["sets","lo","hi"].includes(f)){ex[f]=Math.max(f==="sets"?1:0,Math.round(parse(val)||0));if(ex.hi<ex.lo)ex.hi=ex.lo;return}
+    if(f==="step"){ex.step=Math.max(0.5,parse(val)||2.5);return}
+    ex[f]=val}}
+function peClick(b){const a=b.dataset.pe,se=peSession(),i=+b.dataset.i,j=+b.dataset.j;
+  const mv=(arr,k,d)=>{const t=k+d;if(t<0||t>=arr.length)return;[arr[k],arr[t]]=[arr[t],arr[k]]};
+  if(a==="sel")peSid=b.dataset.id;
+  else if(a==="addsess"){const used=new Set(PE.sessions.map(x=>x.id));let id="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").find(c=>!used.has(c))||rid("S");PE.sessions.push({id,name:id,slots:[]});peSid=id}
+  else if(a==="delsess"){if(PE.sessions.length<=1){toast("Plan musi mieć co najmniej jedną sesję");return}if(!b.dataset.ok){b.dataset.ok=1;b.textContent="Na pewno? Dotknij jeszcze raz";return}PE.sessions=PE.sessions.filter(x=>x.id!==peSid);peSid=PE.sessions[0].id}
+  else if(a==="sessup"||a==="sessdown"){const k=PE.sessions.indexOf(se);mv(PE.sessions,k,a==="sessup"?-1:1)}
+  else if(a==="sladd")se.slots.push({id:rid("b"),rest:90,title:"Nowy blok",rule:"",min:false,ex:[{key:rid("e"),label:"Ćwiczenie",opts:["Wpisz nazwę"],def:0,sets:3,lo:8,hi:12,unit:"kg",step:2.5}]});
+  else if(a==="slup"||a==="sldown")mv(se.slots,i,a==="slup"?-1:1);
+  else if(a==="sldel"){if(!b.dataset.ok){b.dataset.ok=1;b.textContent="Na pewno?";return}se.slots.splice(i,1)}
+  else if(a==="exadd")se.slots[i].ex.push({key:rid("e"),label:"Ćwiczenie",opts:["Wpisz nazwę"],def:0,sets:3,lo:8,hi:12,unit:"kg",step:2.5});
+  else if(a==="exup")mv(se.slots[i].ex,j,-1);
+  else if(a==="exdel"){if(se.slots[i].ex.length<=1){se.slots.splice(i,1)}else se.slots[i].ex.splice(j,1)}
+  else if(a==="cancel"){PE=null;tab="settings";render();return}
+  else if(a==="reset"){if(!b.dataset.ok){b.dataset.ok=1;b.textContent="Nadpisze Twój plan. Dotknij jeszcze raz";return}PE=defaultPlan();PE.note=GMODE()?"":IGOR_NOTE;peSid=PE.sessions[0].id}
+  else if(a==="save"){
+    for(const x of PE.sessions)for(const sl of x.slots){if(!sl.id)sl.id=rid("b");for(const ex of sl.ex){if(!ex.key)ex.key=rid("e");if(!ex.opts.length)ex.opts=["Ćwiczenie"]}}
+    PLAN=PE;PE=null;savePlan();
+    if(draft&&!draftHasSets()){draft=null;ls.del("draft")}else if(draft&&draft.type!=="Dom"&&!sessionIds().includes(draft.type)){toast("Bieżący trening jest z usuniętej sesji, zapisz go albo wyczyść")}
+    tab="sila";document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab==="sila"));toast("Plan zapisany");render();return}
+  render()}
+function savePlan(){PLAN.updated=new Date().toISOString();ls.set("plan",PLAN);if(GMODE())gSavePlan(PLAN).catch(()=>toast("Plan zapisany w telefonie, do arkusza wyślę przy następnym połączeniu"))}
 
 // ---------- Home timer (stoper) ----------
 const HOME=[
@@ -758,6 +840,8 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.rdec||b.dataset.rinc){const id=b.dataset.rdec||b.dataset.rinc,sl=plan(draft.type).find(x=>x.id===id);restCfg[id]=Math.max(15,restFor(sl)+(b.dataset.rinc?15:-15));ls.set("rest-cfg",restCfg);render();return}
   if(b.dataset.rgo){const sl=plan(draft.type).find(x=>x.id===b.dataset.rgo);startRest(restFor(sl));return}
   if(b.id==="open-setup"){tab="setup";render();return}
+  if(b.id==="open-plan"){PE=null;tab="planed";render();window.scrollTo(0,0);return}
+  if(b.dataset.pe){peClick(b);return}
   if(b.id==="g-login"){if(NATIVE){toast("Logowanie Google działa na razie w wersji z Chrome, nie w aplikacji na Androida.");return}
     b.disabled=true;b.textContent="Łączę…";
     try{await gLogin("select_account");const email=await gEmail();const prev=cfg;cfg={mode:"google",email:email};if(prev.mode==="google"&&prev.email===email&&prev.sheetId)cfg.sheetId=prev.sheetId;ls.set("cfg",cfg);
@@ -818,10 +902,11 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.del){const id=b.dataset.del; if(armed===id){armed=null; try{await removeEntry(id); toast("Usunięto z arkusza")}catch(e){toast("Nie usunięto. Usuwanie działa tylko z internetem."); render()}} else {armed=id; render()} return}
 });
 document.addEventListener("change",ev=>{
-  const el=ev.target; if(el.tagName!=="INPUT") return;
+  const el=ev.target; if(el.dataset&&el.dataset.pf){peField(el.dataset.pf,el);if(el.dataset.pf.endsWith(".opts")||el.dataset.pf.endsWith(".unit"))render();return} if(el.tagName!=="INPUT") return;
   if(el.dataset.nameFor){const k=el.dataset.nameFor,it=itemOf(k),name=el.value.trim(); if(name){it.ex=name; if(it.mode!=="time"){const last=lastFor(name); if(last) it.w=last.w;} it.other=false} saveDraft(); render(); return}
   const v=parse(el.value);
   if(el.id==="t-custom"||el.id==="gym-new") return;
+  if(el.dataset.pf){peField(el.dataset.pf,el);if(el.dataset.pf.endsWith(".opts"))render();return}
   if(el.id==="pdt"){const f=pf();f.dt=el.value;ls.set("pom-form",f);return}
   if(el.id==="wnote"){draft.note=el.value.trim();saveDraft();return}
   if(el.dataset.noteFor){const it=itemOf(el.dataset.noteFor);it.note=el.value.trim();saveDraft();return}
