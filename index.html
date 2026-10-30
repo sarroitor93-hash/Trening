@@ -259,7 +259,7 @@ function build(d){
 const queue=()=>ls.get("queue",[]);
 function withQueue(list){const ids=new Set(list.map(e=>e.id));return list.concat(queue().filter(e=>!ids.has(e.id)))}
 function setEntries(list){entries=list.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));if(draft&&draft.auto&&!draftHasSets())draft=null;render()}
-function syncLabel(){const q=queue().length;if(!ready())return setSync("Nie połączono",true);if(GMODE()&&(needLogin||!gTokOk())){$("#sync").dataset.relogin="1";return setSync((q?q+" czeka · ":"")+"Dotknij, by zsynchronizować",true)}delete $("#sync").dataset.relogin;if(!navigator.onLine)return setSync(q?"Offline · "+q+" w kolejce":"Offline",true);setSync(q?q+" czeka na wysłanie":(GMODE()?"Twój arkusz · połączono":"Arkusz Google · połączono"),!!q)}
+function syncLabel(){const q=queue().length;if(!ready())return setSync("Nie połączono",true);if(GMODE()&&(needLogin||(!gTokOk()&&!NAUTH()))){$("#sync").dataset.relogin="1";return setSync((q?q+" czeka · ":"")+"Dotknij, by zsynchronizować",true)}delete $("#sync").dataset.relogin;if(!navigator.onLine)return setSync(q?"Offline · "+q+" w kolejce":"Offline",true);setSync(q?q+" czeka na wysłanie":(GMODE()?"Twój arkusz · połączono":"Arkusz Google · połączono"),!!q)}
 // ---------- Google: logowanie i własny arkusz użytkownika (Sheets API, zakres drive.file) ----------
 const G_CLIENT="288637060767-m1c6nb6dv2mc0qo52o8fe3rcnfcg7ejr.apps.googleusercontent.com";
 const G_SCOPE="https://www.googleapis.com/auth/drive.file openid email";
@@ -269,13 +269,17 @@ const GN={gym:"Siłownia",run:"Bieg",meas:"Pomiary"},GC={gym:"T",run:"G",meas:"D
 let gTok=ls.get("gtok",null),gClient=null,gWait=null;
 const gTokOk=()=>gTok&&gTok.exp>Date.now()+60000;
 function gLoad(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const sc=document.createElement("script");sc.src="https://accounts.google.com/gsi/client";sc.onload=()=>res();sc.onerror=()=>rej(new Error("gsi"));document.head.appendChild(sc)})}
-function gLogin(prompt){return gLoad().then(()=>new Promise((res,rej)=>{
+const NAUTH=()=>!!(window.TreningNative&&window.TreningNative.googleAuth);
+let nativeAuthWait=null;
+window.onNativeAuth=(tok,err)=>{const w=nativeAuthWait;nativeAuthWait=null;if(!w)return;if(tok){gTok={t:tok,exp:Date.now()+3300*1000};ls.set("gtok",gTok);w.res(gTok)}else w.rej(new Error(err||"auth"))};
+function nativeAuth(interactive){if(nativeAuthWait)nativeAuthWait.rej(new Error("superseded"));return new Promise((res,rej)=>{nativeAuthWait={res,rej};try{window.TreningNative.googleAuth(!!interactive)}catch(e){nativeAuthWait=null;rej(e)}})}
+function gLogin(prompt){if(NAUTH())return nativeAuth(true);return gLoad().then(()=>new Promise((res,rej)=>{
   gClient=google.accounts.oauth2.initTokenClient({client_id:G_CLIENT,scope:G_SCOPE,login_hint:cfg.email||undefined,callback:r=>{if(r.error)return rej(new Error(r.error));gTok={t:r.access_token,exp:Date.now()+(r.expires_in||3600)*1000};ls.set("gtok",gTok);res(gTok)},error_callback:e=>rej(new Error(e&&e.type||"popup"))});
   gClient.requestAccessToken({prompt:prompt==null?"":prompt})}))}
-async function gFetch(url,opt){
-  if(!gTokOk())throw {auth:true};
+async function gFetch(url,opt,retry){
+  if(!gTokOk()){if(NAUTH()){try{await nativeAuth(false)}catch(e){throw {auth:true}}}else throw {auth:true}}
   opt=Object.assign({},opt||{});opt.headers=Object.assign({"Authorization":"Bearer "+gTok.t},opt.body?{"Content-Type":"application/json"}:{},opt.headers||{});
-  const r=await fetch(url,opt);if(r.status===401){gTok=null;ls.del("gtok");throw {auth:true}}
+  const r=await fetch(url,opt);if(r.status===401){gTok=null;ls.del("gtok");if(NAUTH()&&!retry)return gFetch(url,opt,true);throw {auth:true}}
   const j=r.status===204?{}:await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||("HTTP "+r.status));return j}
 const SH="https://sheets.googleapis.com/v4/spreadsheets/";
 async function gEmail(){const j=await gFetch("https://www.googleapis.com/oauth2/v3/userinfo");return j.email}
@@ -331,7 +335,7 @@ function flush(){if(!flushing)flushing=doFlush().finally(()=>{flushing=null});re
 let needLogin=false;
 async function doFlush(){
   let q=queue(); if(!q.length||!ready()||!navigator.onLine) return syncLabel();
-  if(GMODE()&&!gTokOk()){needLogin=true;return syncLabel()}
+  if(GMODE()&&!gTokOk()&&!NAUTH()){needLogin=true;return syncLabel()}
   for(const e of q.slice()){try{await api({action:"save",entry:e}); q=queue().filter(x=>x.id!==e.id); ls.set("queue",q)}catch(err){if(err&&err.auth)needLogin=true;break}}
   syncLabel();
 }
@@ -842,7 +846,7 @@ document.addEventListener("click",async ev=>{
   if(b.id==="open-setup"){tab="setup";render();return}
   if(b.id==="open-plan"){PE=null;tab="planed";render();window.scrollTo(0,0);return}
   if(b.dataset.pe){peClick(b);return}
-  if(b.id==="g-login"){if(NATIVE){toast("Logowanie Google działa na razie w wersji z Chrome, nie w aplikacji na Androida.");return}
+  if(b.id==="g-login"){if(NATIVE&&!NAUTH()){toast("Zaktualizuj aplikację na Androida (pobierz nowy plik .apk), żeby logować się przez Google.");return}
     b.disabled=true;b.textContent="Łączę…";
     try{await gLogin("select_account");const email=await gEmail();const prev=cfg;cfg={mode:"google",email:email};if(prev.mode==="google"&&prev.email===email&&prev.sheetId)cfg.sheetId=prev.sheetId;ls.set("cfg",cfg);
       if(prev.mode!=="google"||prev.email!==email){ls.del("cache");ls.del("queue");ls.del("draft");draft=null}

@@ -17,9 +17,55 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import com.google.android.gms.auth.api.identity.AuthorizationRequest;
+import com.google.android.gms.auth.api.identity.AuthorizationResult;
+import com.google.android.gms.auth.api.identity.Identity;
+import com.google.android.gms.common.api.Scope;
+
+import org.json.JSONObject;
+
+import java.util.Arrays;
+
 public class MainActivity extends Activity {
     static final String URL = "https://sarroitor93-hash.github.io/Trening/";
+    static final int REQ_AUTH = 77;
     WebView web;
+
+    void js(String code) { runOnUiThread(() -> web.evaluateJavascript(code, null)); }
+
+    void authResult(String token, String err) {
+        js("window.onNativeAuth&&window.onNativeAuth(" + (token == null ? "null" : JSONObject.quote(token)) + "," + (err == null ? "null" : JSONObject.quote(err)) + ")");
+    }
+
+    /** Token Google (drive.file + email) przez Google Play Services. Bez okna, gdy zgoda już jest. */
+    void authorize(boolean interactive) {
+        AuthorizationRequest req = AuthorizationRequest.builder().setRequestedScopes(Arrays.asList(
+                new Scope("https://www.googleapis.com/auth/drive.file"), new Scope("email"), new Scope("openid"))).build();
+        Identity.getAuthorizationClient(this).authorize(req)
+                .addOnSuccessListener(res -> {
+                    if (res.hasResolution()) {
+                        if (!interactive) { authResult(null, "need"); return; }
+                        try {
+                            startIntentSenderForResult(res.getPendingIntent().getIntentSender(), REQ_AUTH, null, 0, 0, 0, null);
+                        } catch (Exception e) { authResult(null, String.valueOf(e.getMessage())); }
+                    } else {
+                        authResult(res.getAccessToken(), res.getAccessToken() == null ? "notoken" : null);
+                    }
+                })
+                .addOnFailureListener(e -> authResult(null, String.valueOf(e.getMessage())));
+    }
+
+    @Override
+    protected void onActivityResult(int req, int code, Intent data) {
+        super.onActivityResult(req, code, data);
+        if (req != REQ_AUTH) return;
+        try {
+            AuthorizationResult r = Identity.getAuthorizationClient(this).getAuthorizationResultFromIntent(data);
+            authResult(r.getAccessToken(), r.getAccessToken() == null ? "notoken" : null);
+        } catch (Exception e) {
+            authResult(null, code == RESULT_CANCELED ? "cancel" : String.valueOf(e.getMessage()));
+        }
+    }
 
     @Override
     protected void onCreate(Bundle b) {
@@ -71,7 +117,12 @@ public class MainActivity extends Activity {
         final Activity a;
         Bridge(Activity a) { this.a = a; }
 
-        @JavascriptInterface public int version() { return 1; }
+        @JavascriptInterface public int version() { return 2; }
+
+        @JavascriptInterface
+        public void googleAuth(final boolean interactive) {
+            a.runOnUiThread(() -> ((MainActivity) a).authorize(interactive));
+        }
 
         @JavascriptInterface
         public void restStart(double endMs, String title, String next, boolean sound, boolean vibrate) {
