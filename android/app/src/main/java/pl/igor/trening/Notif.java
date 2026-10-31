@@ -11,6 +11,8 @@ import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.os.Build;
+import android.os.SystemClock;
+import android.widget.RemoteViews;
 
 /** Powiadomienia treningu: licznik przerwy (chronometr systemowy) i alarm na koniec przerwy. */
 final class Notif {
@@ -18,6 +20,8 @@ final class Notif {
     static final String CH_SOUND = "alert_sound";
     static final String CH_VIB = "alert_vib";
     static final String CH_QUIET = "alert_quiet";
+    static final String CH_LOW = "alert_low";
+    static final String CH_LOUD = "alert_loud";
     static final int ID_STATUS = 1;
     static final int ID_ALERT = 2;
     static final String PREFS = "trening";
@@ -35,6 +39,22 @@ final class Notif {
                 new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
         nm.createNotificationChannel(snd);
+
+        NotificationChannel low = new NotificationChannel(CH_LOW, "Koniec przerwy (cichy)", NotificationManager.IMPORTANCE_HIGH);
+        low.enableVibration(true);
+        low.setVibrationPattern(new long[]{0, 300, 150, 300});
+        low.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+        nm.createNotificationChannel(low);
+
+        NotificationChannel loud = new NotificationChannel(CH_LOUD, "Koniec przerwy (głośny)", NotificationManager.IMPORTANCE_HIGH);
+        loud.enableVibration(true);
+        loud.setVibrationPattern(new long[]{0, 500, 200, 500, 200, 500});
+        loud.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+        nm.createNotificationChannel(loud);
 
         NotificationChannel vib = new NotificationChannel(CH_VIB, "Koniec przerwy (tylko wibracja)", NotificationManager.IMPORTANCE_HIGH);
         vib.enableVibration(true);
@@ -66,13 +86,26 @@ final class Notif {
 
     /** Licznik przerwy odliczany przez system + alarm dokładnie na koniec. */
     static void restStart(Context c, long endMs, String title, String next, boolean sound, boolean vibrate) {
+        restStart(c, endMs, title, next, sound ? "sredni" : "off", vibrate);
+    }
+
+    static void restStart(Context c, long endMs, String title, String next, String level, boolean vibrate) {
         channels(c);
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         nm.cancel(ID_ALERT);
+        RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.notif_rest);
+        long base = SystemClock.elapsedRealtime() + (endMs - System.currentTimeMillis());
+        rv.setChronometer(R.id.chrono, base, null, true);
+        rv.setChronometerCountDown(R.id.chrono, true);
+        rv.setTextViewText(R.id.title, title);
+        rv.setTextViewText(R.id.next, next);
         Notification.Builder b = new Notification.Builder(c, CH_STATUS)
                 .setSmallIcon(R.drawable.ic_stat)
                 .setContentTitle(title)
                 .setContentText(next)
+                .setStyle(new Notification.DecoratedCustomViewStyle())
+                .setCustomContentView(rv)
+                .setCustomBigContentView(rv)
                 .setWhen(endMs)
                 .setShowWhen(true)
                 .setUsesChronometer(true)
@@ -85,7 +118,7 @@ final class Notif {
         nm.notify(ID_STATUS, b.build());
 
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        p.edit().putString("next", next).putBoolean("sound", sound).putBoolean("vib", vibrate).apply();
+        p.edit().putString("next", next).putString("level", level).putBoolean("vib", vibrate).apply();
 
         AlarmManager am = c.getSystemService(AlarmManager.class);
         PendingIntent pi = alarmIntent(c);
@@ -105,8 +138,9 @@ final class Notif {
     static void restEnd(Context c) {
         channels(c);
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        boolean sound = p.getBoolean("sound", true), vib = p.getBoolean("vib", true);
-        String ch = sound ? CH_SOUND : (vib ? CH_VIB : CH_QUIET);
+        String level = p.getString("level", "sredni");
+        boolean vib = p.getBoolean("vib", true), sound = !"off".equals(level);
+        String ch = "glosno".equals(level) ? CH_LOUD : "cicho".equals(level) ? CH_LOW : sound ? CH_SOUND : (vib ? CH_VIB : CH_QUIET);
         String next = p.getString("next", "");
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         nm.cancel(ID_STATUS);

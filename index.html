@@ -348,7 +348,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list));
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list));
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -371,6 +371,14 @@ async function oneTimeAdd3(list){
   try{await addEntry({kind:"sila",type:"Hyrox",minimum:false,date:"2026-10-28T06:00:00.000Z",durMin:42,note:"Zajęcia Hyrox (Multisport)",
     items:[{key:"extra",ex:"Hyrox EMOM 7'×6",mode:"time",min:42,sets:[],note:"Bieg 200 m, 8 devil press 2×15 kg, 25–30 wykroków z workiem 20 kg, 25 wall balli 9 kg, 12 kcal ski erg, sanie ciąg+pchanie; ok. 60–70% objętości; najsłabiej bieg, potem devil press"}]});
     toast("Dopisałem Hyrox z 28.10")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
+}
+async function oneTimeFix4(list){
+  const FIX="fix-31-10-przysiad"; if(ls.get(FIX,false)) return;
+  const e=list.find(x=>x.id==="smvw5rwonc29j"); if(!e){ls.set(FIX,true);return}
+  const sq=e.items.find(i=>i.key==="silaB"); if(!sq||(sq.ws&&sq.ws.length)){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+(e.note||"");
+  for(const it of fixed.items) if(it.key==="silaB"){it.ws=[115,115,115,120];it.w=120}
+  ls.set(FIX,true); try{await removeEntry(e.id); await addEntry(fixed); toast("Poprawiłem przysiad z 31.10: ostatnia seria 120 kg")}catch(err){ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
@@ -440,8 +448,10 @@ function allItems(){const out=[];for(const s of plan(draft.type))for(const ex of
 
 // ---------- Prefs: sound & vibration ----------
 let prefs=Object.assign({snd:"cicho",vib:true,notif:false},ls.get("prefs",{}));
+if(prefs.sv!==2){if(prefs.snd==="glosno")prefs.snd="sredni";prefs.sv=2;ls.set("prefs",prefs)}
 const savePrefs=()=>ls.set("prefs",prefs);
 const NATIVE=window.TreningNative||null;
+function nRest(end,title,next){if(NATIVE.restStartLevel)NATIVE.restStartLevel(end,title,next,prefs.snd,!!prefs.vib);else NATIVE.restStart(end,title,next,prefs.snd!=="off",!!prefs.vib)}
 function vib(pat){try{if(!prefs.vib)return;if(NATIVE){NATIVE.vibrate(Array.isArray(pat)?pat[0]:pat);return}if(navigator.vibrate)navigator.vibrate(pat)}catch(e){}}
 // ---------- Status notification (pasek powiadomień) ----------
 const canNotif=()=>!NATIVE&&prefs.notif&&"Notification" in window&&Notification.permission==="granted"&&"serviceWorker" in navigator;
@@ -456,7 +466,7 @@ const restFor=sl=>restCfg[sl.id]!=null?restCfg[sl.id]:(sl.rest||90);
 function roundDone(sl,i){if(!sl)return true;return sl.ex.every(ex=>{const it=draft.items[ex.key];if(!it||it.skip)return true;const n=setsFor(ex)+(it.plus||0);return i>=n||it.sets[i]!=null})}
 function slotOf(key){if(!draft||key[0]==="x")return null;for(const sl of plan(draft.type))if(sl.ex.some(e=>e.key===key))return sl;return null}
 function startRest(sec){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
-  restAt=Date.now();restDur=sec||90;restBeeped=false;drawRest.over=null;$("#rest").hidden=false;{const nx=nextUp();if(NATIVE){try{NATIVE.restStart(restAt+restDur*1000,"Przerwa",nx?"Następne: "+nx:"Ostatnia seria za Tobą",prefs.snd!=="off",!!prefs.vib)}catch(e){}}else statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"Ostatnia seria za Tobą")+" · "+mmssR(restDur),false)}if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
+  restAt=Date.now();restDur=sec||90;restBeeped=false;drawRest.over=null;$("#rest").hidden=false;{const nx=nextUp();if(NATIVE){try{nRest(restAt+restDur*1000,"Przerwa",nx?"Następne: "+nx:"Ostatnia seria za Tobą")}catch(e){}}else statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"Ostatnia seria za Tobą")+" · "+mmssR(restDur),false)}if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
 function stopRest(){const was=!!restAt;restAt=null;if(was&&NATIVE){try{NATIVE.restStop()}catch(e){}}if(was)setTimeout(notifIdle,50);$("#rest").hidden=true;clearInterval(restTick);restTick=null;$("#rest").classList.remove("over")}
 function drawRest(){if(!restAt)return;const left=restDur-(Date.now()-restAt)/1000,el=$("#rest");
   if(left<=3&&left>0&&Math.ceil(left)!==drawRest.last){drawRest.last=Math.ceil(left);beep(660,110)}
@@ -470,7 +480,7 @@ function mmssR(x){x=Math.max(0,Math.ceil(x));return Math.floor(x/60)+":"+String(
 $("#rest-x").addEventListener("click",stopRest);
 $("#sync").addEventListener("click",async()=>{if(!$("#sync").dataset.relogin)return;try{await gLogin("");needLogin=false;await flush();await load()}catch(e){toast("Nie udało się połączyć z Google")}});
 window.nativeStopped=()=>{if(restAt)stopRest()};
-function restNotifUpdate(){if(!restAt)return;const nx=nextUp();if(NATIVE){try{NATIVE.restStart(restAt+restDur*1000,"Przerwa",nx?"Następne: "+nx:"",prefs.snd!=="off",!!prefs.vib)}catch(e){}return}statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"")+"",false)}
+function restNotifUpdate(){if(!restAt)return;const nx=nextUp();if(NATIVE){try{nRest(restAt+restDur*1000,"Przerwa",nx?"Następne: "+nx:"")}catch(e){}return}statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"")+"",false)}
 $("#rest-m").addEventListener("click",()=>{restDur=Math.max(0,restDur-15);restBeeped=false;drawRest();restNotifUpdate()});
 $("#rest-p").addEventListener("click",()=>{restDur+=15;restBeeped=false;drawRest();restNotifUpdate()});
 function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2400)}
@@ -616,7 +626,7 @@ function renderHist(){
 }
 function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
     <span class="ex-label">Dźwięk (przerwy i stoper)</span>
-    <div class="chips">${[["off","Wyłączony"],["cicho","Cichy"],["glosno","Głośny"]].map(([k,l])=>`<button class="chip" data-snd="${k}" aria-pressed="${prefs.snd===k}">${l}</button>`).join("")}</div>
+    <div class="chips">${[["off","Wyłączony"],["cicho","Cichy"],["sredni","Średni"],["glosno","Głośny"]].map(([k,l])=>`<button class="chip" data-snd="${k}" aria-pressed="${prefs.snd===k}">${l}</button>`).join("")}</div>
     <span class="ex-label">Wibracje</span>
     <div class="chips"><button class="chip" id="vib" aria-pressed="${prefs.vib}">${prefs.vib?"Włączone":"Wyłączone"}</button></div>
     ${NATIVE?`<span class="ex-label">Powiadomienia</span><p class="hint">Obsługuje je aplikacja na Androida: licznik przerwy na pasku i alarm na koniec przerwy (dźwięk zgodnie z ustawieniem powyżej).</p></section>`:`<span class="ex-label">Powiadomienie na pasku w trakcie treningu</span>
@@ -807,7 +817,7 @@ function renderTimerCard(){
    <p class="hint num">Runda = ${tc.list.length} × ${tc.work} s${tc.rest?` + przerwy ${tc.rest} s`:""}. Razem ok. <b>${mmss(total)}</b> min.</p>
    <div class="two"><button class="ghost" id="t-preset">Mój EMOM 24 min</button><button class="primary" id="t-start" ${tc.list.length?"":"disabled"}>▶ Start</button></div></section>`}
 let T=null,actx=null,wake=null;
-function beep(f,ms){try{if(!actx||prefs.snd==="off")return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(prefs.snd==="glosno"?.25:.04,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
+function beep(f,ms){try{if(!actx||prefs.snd==="off")return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;if(prefs.snd==="glosno")o.type="square";o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(prefs.snd==="glosno"?.45:prefs.snd==="sredni"?.25:.04,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
 async function lockScreen(){if(NATIVE){try{NATIVE.keepScreenOn(true)}catch(e){}}try{if("wakeLock" in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(T&&!T.done&&document.visibilityState==="visible")lockScreen()});
 function tStart(){

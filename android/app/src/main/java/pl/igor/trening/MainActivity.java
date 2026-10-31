@@ -117,7 +117,12 @@ public class MainActivity extends Activity {
         final Activity a;
         Bridge(Activity a) { this.a = a; }
 
-        @JavascriptInterface public int version() { return 2; }
+        @JavascriptInterface public int version() { return 3; }
+
+        @JavascriptInterface
+        public void restStartLevel(double endMs, String title, String next, String level, boolean vibrate) {
+            Notif.restStart(a.getApplicationContext(), (long) endMs, title, next, level, vibrate);
+        }
 
         @JavascriptInterface
         public void googleAuth(final boolean interactive) {
