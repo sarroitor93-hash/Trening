@@ -348,7 +348,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list));
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list));
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -397,6 +397,14 @@ async function oneTimeRestore5(list){
       it("triceps","Prostowanie jednorącz",9,[15,15])]});
     toast("Przywróciłem trening B z 31.10 (przysiad 115/115/115/120)")}
   catch(err){if(err&&err.queued)toast("Trening z 31.10 przywrócony w telefonie – czeka na wysłanie"+(lastSaveErr?" ("+lastSaveErr+")":""));else ls.set(FIX,false)}
+}
+async function oneTimeFix6(list){
+  const FIX="fix-31-10-brzuch"; if(ls.get(FIX,false)) return;
+  const e=list.find(x=>x.kind==="sila"&&x.type==="B"&&String(x.date).slice(0,10)==="2026-10-31");
+  if(!e||e.items.some(i=>i.key==="brzuch")){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+(e.note||"");
+  fixed.items.push({key:"brzuch",ex:"Brzuszki na maszynie",w:50,sets:[10,10]});
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Dopisałem brzuch do 31.10: 2×10 × 50 kg")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
