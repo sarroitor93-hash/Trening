@@ -259,7 +259,7 @@ function build(d){
 const queue=()=>ls.get("queue",[]);
 function withQueue(list){const ids=new Set(list.map(e=>e.id));return list.concat(queue().filter(e=>!ids.has(e.id)))}
 function setEntries(list){entries=list.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));if(draft&&draft.auto&&!draftHasSets())draft=null;render()}
-function syncLabel(){const q=queue().length;if(!ready())return setSync("Nie połączono",true);if(GMODE()&&(needLogin||(!gTokOk()&&!NAUTH()))){$("#sync").dataset.relogin="1";return setSync((q?q+" czeka · ":"")+"Dotknij, by zsynchronizować",true)}delete $("#sync").dataset.relogin;if(!navigator.onLine)return setSync(q?"Offline · "+q+" w kolejce":"Offline",true);setSync(q?q+" czeka na wysłanie":(GMODE()?"Twój arkusz · połączono":"Arkusz Google · połączono"),!!q)}
+function syncLabel(){const q=queue().length;if(!ready())return setSync("Nie połączono",true);if(GMODE()&&(needLogin||(!gTokOk()&&!NAUTH()))){$("#sync").dataset.relogin="1";return setSync((q?q+" czeka · ":"")+"Dotknij, by zsynchronizować",true)}delete $("#sync").dataset.relogin;if(!navigator.onLine)return setSync(q?"Offline · "+q+" w kolejce":"Offline",true);setSync(q?q+" czeka na wysłanie"+(lastSaveErr?" · błąd: "+lastSaveErr.slice(0,60):""):(GMODE()?"Twój arkusz · połączono":"Arkusz Google · połączono"),!!q)}
 // ---------- Google: logowanie i własny arkusz użytkownika (Sheets API, zakres drive.file) ----------
 const G_CLIENT="288637060767-m1c6nb6dv2mc0qo52o8fe3rcnfcg7ejr.apps.googleusercontent.com";
 const G_SCOPE="https://www.googleapis.com/auth/drive.file openid email";
@@ -332,11 +332,11 @@ async function api(body){
 }
 let flushing=null;
 function flush(){if(!flushing)flushing=doFlush().finally(()=>{flushing=null});return flushing}
-let needLogin=false;
+let needLogin=false,lastSaveErr="";
 async function doFlush(){
   let q=queue(); if(!q.length||!ready()||!navigator.onLine) return syncLabel();
   if(GMODE()&&!gTokOk()&&!NAUTH()){needLogin=true;return syncLabel()}
-  for(const e of q.slice()){try{await api({action:"save",entry:e}); q=queue().filter(x=>x.id!==e.id); ls.set("queue",q)}catch(err){if(err&&err.auth)needLogin=true;break}}
+  for(const e of q.slice()){try{await api({action:"save",entry:e}); q=queue().filter(x=>x.id!==e.id); ls.set("queue",q)}catch(err){if(err&&err.auth){needLogin=true;break}console.warn("save fail",e.id,err);lastSaveErr=String(err&&err.message||err)}}
   syncLabel();
 }
 async function load(){
@@ -348,7 +348,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list));
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list));
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -362,7 +362,7 @@ async function oneTimeFixes(list){
     if(it.key==="nogi"){it.ex="Uginanie nóg leżąc (maszyna)";it.sets=[8,8,8]}
     if(it.key==="barki"){it.sets=[14,14,14]}
   }
-  ls.set(FIX,true); try{await removeEntry(e.id); await addEntry(fixed); toast("Poprawiłem trening z 20.10: uginanie leżąc 3×8, odwodzenie 3×14")}catch(err){ls.set(FIX,false)}
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem trening z 20.10: uginanie leżąc 3×8, odwodzenie 3×14")}catch(err){ls.set(FIX,false)}
 }
 async function oneTimeAdd3(list){
   const FIX="add-28-10-hyrox"; if(ls.get(FIX,false)) return;
@@ -378,7 +378,25 @@ async function oneTimeFix4(list){
   const sq=e.items.find(i=>i.key==="silaB"); if(!sq||(sq.ws&&sq.ws.length)){ls.set(FIX,true);return}
   const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+(e.note||"");
   for(const it of fixed.items) if(it.key==="silaB"){it.ws=[115,115,115,120];it.w=120}
-  ls.set(FIX,true); try{await removeEntry(e.id); await addEntry(fixed); toast("Poprawiłem przysiad z 31.10: ostatnia seria 120 kg")}catch(err){ls.set(FIX,false)}
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem przysiad z 31.10: ostatnia seria 120 kg")}catch(err){ls.set(FIX,false)}
+}
+async function oneTimeRestore5(list){
+  const FIX="restore-31-10-B"; if(ls.get(FIX,false)) return;
+  const has=x=>x.kind==="sila"&&x.type==="B"&&String(x.date).slice(0,10)==="2026-10-31";
+  if(list.some(has)||queue().some(has)){ls.set(FIX,true);return}
+  ls.set(FIX,true);
+  const it=(key,ex,w,sets,extra)=>Object.assign({key,ex,w,sets},extra||{});
+  try{await addEntry({kind:"sila",type:"B",minimum:false,date:"2026-10-31T08:48:00.000Z",durMin:71,note:"@Zdrofit Kłobucka | ",
+    items:[it("skoki","Wskok na skrzynię",75,[5,5,5]),
+      it("silaB","Przysiad ze sztangą",120,[5,5,5,5],{ws:[115,115,115,120]}),
+      it("klatka","Wyciskanie hantli – skos",30,[7,6,5,5]),
+      it("plecy","Wiosłowanie linką (dół)",73,[8,8,8,8],{note:"Podchwytem"}),
+      it("nogi","Uginanie nóg siedząc (maszyna)",86,[8,8,8]),
+      it("barki","Odwodzenie hantlami",8,[10,10,10]),
+      it("biceps","Uginanie – sztanga",30,[10,10]),
+      it("triceps","Prostowanie jednorącz",9,[15,15])]});
+    toast("Przywróciłem trening B z 31.10 (przysiad 115/115/115/120)")}
+  catch(err){if(err&&err.queued)toast("Trening z 31.10 przywrócony w telefonie – czeka na wysłanie"+(lastSaveErr?" ("+lastSaveErr+")":""));else ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
@@ -389,7 +407,7 @@ async function oneTimeFix2(list){
     if(it.key==="silaC"){it.sets=[6,6,6,6];it.ws=[170,180,180,180];it.w=180}
     if(it.key==="barki"){it.ex="Odwodzenie hantlami"}
   }
-  ls.set(FIX,true); try{await removeEntry(e.id); await addEntry(fixed); toast("Poprawiłem trening z 22.10: suwnica 4 serie, odwodzenie hantlami")}catch(err){ls.set(FIX,false)}
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem trening z 22.10: suwnica 4 serie, odwodzenie hantlami")}catch(err){ls.set(FIX,false)}
 }
 async function addEntry(e){
   e.date=e.date||new Date().toISOString(); e.id="s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
