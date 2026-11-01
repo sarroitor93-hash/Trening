@@ -178,13 +178,13 @@ const KLATKA=["Wyciskanie hantli – skos","Wyciskanie hantli – płasko","Wyci
 const PLECY=["Ściąganie drążka / linki","Wiosłowanie hantlą","Wiosłowanie linką (dół)","Podciąganie"];
 const UGIN=["Uginanie nóg siedząc (maszyna)","Uginanie nóg leżąc (maszyna)"];
 const PROST=["Prostowanie nóg (maszyna)"];
-const NOGI=[...UGIN,...PROST,"RDL"];
+const NOGI=[...UGIN,...PROST,"RDL","RDL – hantle","Wyprosty na ławce rzymskiej"];
 const TYL=["Odwrotne rozpiętki (maszyna)","Odwrotne rozpiętki (hantle)","Face pull"];
 const LYDKI=["Wznosy na łydki stojąc","Wznosy na łydki siedząc","Wznosy na łydki na suwnicy"];
 const BOKI=["Odwodzenie linką","Odwodzenie hantlami","Odwodzenie na maszynie","Wyciskanie nad głowę – hantle","Wyciskanie nad głowę – maszyna"];
 const ABS=["Brzuszki na maszynie","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)","Spięcia na linie"];
-const BIC=["Uginanie – hantle","Uginanie – sztanga","Uginanie – linka"];
-const TRI=["Prostowanie linką w dół","Prostowanie linką nad głową","Prostowanie jednorącz"];
+const BIC=["Uginanie – hantle","Uginanie – sztanga","Uginanie – linka","Uginanie bayesowskie – brama (oburącz)"];
+const TRI=["Prostowanie linką w dół","Prostowanie linką nad głową","Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"];
 const BW=["Podciąganie","Pompki","Pompki – nogi wyżej","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)"];
 const ALL=[...new Set(["Rozpiętki (maszyna)","Martwy ciąg","RDL","Przysiad hack","Suwnica","Przysiad ze sztangą",...KLATKA,...PLECY,...NOGI,...BOKI,...BIC,...TRI,...ABS,"Wznosy na łydki","Odwrotne rozpiętki","Face pull","Hip thrust","Wykroki","Dipy"])];
 function arms(){return {id:"ramiona",rest:90,title:"4 · Biceps + triceps",rule:"superseria · do upadku",min:false,
@@ -232,6 +232,9 @@ let entries=[];
 let cfg=ls.get("cfg",{url:"",key:""});
 const GMODE=()=>cfg.mode==="google";
 let PLAN=ls.get("plan",null)||defaultPlan();
+(function(){const add=[["Uginanie – linka","Uginanie bayesowskie – brama (oburącz)"],["Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"],["Uginanie nóg siedząc (maszyna)","RDL – hantle"],["Uginanie nóg siedząc (maszyna)","Wyprosty na ławce rzymskiej"]];let ch=false;
+  for(const se of PLAN.sessions||[])for(const sl of se.slots||[])for(const e of sl.ex||[])for(const [k,n] of add)if(e.opts&&e.opts.includes(k)&&!e.opts.includes(n)){e.opts.push(n);ch=true}
+  if(ch&&ls.get("plan",null))ls.set("plan",PLAN)})();
 (function(){const m=location.hash.match(/k=([A-Za-z0-9_-]+)/);if(m){cfg.key=m[1];ls.set("cfg",cfg);history.replaceState(null,"",location.pathname)}})();
 const ready=()=>GMODE()?!!cfg.email:!!(cfg.url&&cfg.key);
 function setSync(t,err){const el=$("#sync");el.textContent=t;el.classList.toggle("err",!!err)}
@@ -348,7 +351,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list));
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list));
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -405,6 +408,15 @@ async function oneTimeFix6(list){
   const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+(e.note||"");
   fixed.items.push({key:"brzuch",ex:"Brzuszki na maszynie",w:50,sets:[10,10]});
   ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Dopisałem brzuch do 31.10: 2×10 × 50 kg")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
+}
+async function oneTimeFix7(list){
+  const FIX="fix-01-11-nazwy-worek"; if(ls.get(FIX,false)) return;
+  const e=list.find(x=>x.id==="smvy3ek583igb"); if(!e){ls.set(FIX,true);return}
+  if(e.items.some(i=>/Worek/.test(i.ex))){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+(e.note||"");
+  for(const it of fixed.items){if(it.key==="biceps")it.ex="Uginanie bayesowskie – brama (oburącz)";if(it.key==="triceps"){it.ex="Prostowanie jednorącz nad głową – wyciąg";it.note="na rękę"}}
+  fixed.items.push({key:"extra",ex:"Worek bokserski",mode:"time",min:15,sets:[],note:"średnia intensywność"});
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem 1.11: nazwy bicepsa i tricepsa, dopisany worek 15 min")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
