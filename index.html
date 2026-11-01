@@ -178,7 +178,8 @@ const KLATKA=["Wyciskanie hantli – skos","Wyciskanie hantli – płasko","Wyci
 const PLECY=["Ściąganie drążka / linki","Wiosłowanie hantlą","Wiosłowanie linką (dół)","Podciąganie"];
 const UGIN=["Uginanie nóg siedząc (maszyna)","Uginanie nóg leżąc (maszyna)"];
 const PROST=["Prostowanie nóg (maszyna)"];
-const NOGI=[...UGIN,...PROST,"RDL","RDL – hantle","Wyprosty na ławce rzymskiej"];
+const NOGI_ALT=["Nordic curl (opuszczanie)","Uginanie nóg na piłce / ślizgach","Przysiad hack","Wykroki bułgarskie","Wykroki chodzone","Wejścia na skrzynię","Suwnica jednonóż","Przysiad sissy"];
+const NOGI=[...UGIN,...PROST,"RDL","RDL – hantle","Wyprosty na ławce rzymskiej",...NOGI_ALT];
 const TYL=["Odwrotne rozpiętki (maszyna)","Odwrotne rozpiętki (hantle)","Face pull"];
 const LYDKI=["Wznosy na łydki stojąc","Wznosy na łydki siedząc","Wznosy na łydki na suwnicy"];
 const BOKI=["Odwodzenie linką","Odwodzenie hantlami","Odwodzenie na maszynie","Wyciskanie nad głowę – hantle","Wyciskanie nad głowę – maszyna"];
@@ -232,7 +233,7 @@ let entries=[];
 let cfg=ls.get("cfg",{url:"",key:""});
 const GMODE=()=>cfg.mode==="google";
 let PLAN=ls.get("plan",null)||defaultPlan();
-(function(){const add=[["Uginanie – linka","Uginanie bayesowskie – brama (oburącz)"],["Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"],["Uginanie nóg siedząc (maszyna)","RDL – hantle"],["Uginanie nóg siedząc (maszyna)","Wyprosty na ławce rzymskiej"]];let ch=false;
+(function(){const add=[["Uginanie – linka","Uginanie bayesowskie – brama (oburącz)"],["Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"],["Uginanie nóg siedząc (maszyna)","RDL – hantle"],["Uginanie nóg siedząc (maszyna)","Wyprosty na ławce rzymskiej"],...NOGI_ALT.map(n=>["Uginanie nóg siedząc (maszyna)",n])];let ch=false;
   for(const se of PLAN.sessions||[])for(const sl of se.slots||[])for(const e of sl.ex||[])for(const [k,n] of add)if(e.opts&&e.opts.includes(k)&&!e.opts.includes(n)){e.opts.push(n);ch=true}
   if(ch&&ls.get("plan",null))ls.set("plan",PLAN)})();
 (function(){const m=location.hash.match(/k=([A-Za-z0-9_-]+)/);if(m){cfg.key=m[1];ls.set("cfg",cfg);history.replaceState(null,"",location.pathname)}})();
@@ -448,7 +449,7 @@ window.addEventListener("offline",syncLabel);
 // ---------- Derived from history ----------
 const strength=()=>entries.filter(e=>e.kind==="sila");
 function nextType(){const ids=sessionIds();if(!ids.length)return "Dom";const s=strength().find(e=>ids.includes(e.type));return s?ids[(ids.indexOf(s.type)+1)%ids.length]:ids[0]}
-const freeWeight=n=>/hantl|sztang|Martwy ciąg|RDL|kettl|Swing|Pompk|Podciąg|Wskok|Skok|bułgarsk|Push press|Kółko|Deska/i.test(n);
+const freeWeight=n=>/hantl|sztang|Martwy ciąg|RDL|kettl|Swing|Pompk|Podciąg|Wskok|Skok|bułgarsk|Wykrok|Wejścia|Nordic|Sissy|piłce|Push press|Kółko|Deska/i.test(n);
 function lastFor(exName){const g=draft&&draft.gym,list=strength().filter(e=>(e.items||[]).some(i=>i.ex===exName));if(!list.length)return null;
   let e=list[0];if(g&&!freeWeight(exName)){const same=list.find(x=>x.gym===g),nog=list.find(x=>!x.gym);e=same||nog||list[0];const it=e.items.find(i=>i.ex===exName);return e.gym&&e.gym!==g?Object.assign({},it,{otherGym:e.gym}):it}
   return e.items.find(i=>i.ex===exName)}
