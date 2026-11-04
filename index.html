@@ -341,6 +341,7 @@ async function doFlush(){
   let q=queue(); if(!q.length||!ready()||!navigator.onLine) return syncLabel();
   if(GMODE()&&!gTokOk()&&!NAUTH()){needLogin=true;return syncLabel()}
   for(const e of q.slice()){try{await api({action:"save",entry:e}); q=queue().filter(x=>x.id!==e.id); ls.set("queue",q)}catch(err){if(err&&err.auth){needLogin=true;break}console.warn("save fail",e.id,err);lastSaveErr=String(err&&err.message||err)}}
+  if(!queue().length){for(const id of ls.get("pendingDel",[]).slice()){try{await api({action:"delete",id});ls.set("pendingDel",ls.get("pendingDel",[]).filter(x=>x!==id));ls.set("cache",ls.get("cache",[]).filter(x=>x.id!==id))}catch(err){break}}}
   syncLabel();
 }
 async function load(){
@@ -582,7 +583,8 @@ function renderSila(){
     <input class="name" id="wnote" placeholder="Notatka do treningu, np. inna siłownia, samopoczucie" value="${esc(draft.note||"")}">
     ${draft.checked&&incomplete().length?`<section class="card" id="incomplete" style="border-color:var(--warn)"><h2>Brakujące serie?</h2><ul style="margin:0;padding-left:18px">${incomplete().map(m=>`<li>${esc(m.ex)}: odhaczone ${m.done} z ${m.n}</li>`).join("")}</ul><div class="two"><button class="primary" id="fill-missing">Dopisz jak ostatnia</button><button class="ghost" id="save-anyway">Zapisz tak jak jest</button></div></section>`:""}
     <button class="primary" id="save" ${draftHasSets()?"":"disabled"}>${draft.editId?"Zapisz zmiany":"Zapisz trening"}</button>
-    <button class="ghost" id="reset">${draft.editId?"Anuluj edycję":"Wyczyść bieżący trening"}</button>
+    <button class="ghost" id="reset" style="margin-top:28px">${draft.editId?"Anuluj edycję":"Wyczyść bieżący trening"}</button>
+    ${!draftHasSets()&&ls.get("draftUndo",null)?`<button class="ghost" id="undo-reset" style="border-color:var(--warn)">↶ Przywróć wyczyszczony trening</button>`:""}
     <datalist id="cardio-ex">${["Schody","Rower","Bieżnia","Wioślarz","Orbitrek","Skakanka","Ski erg"].map(n=>`<option value="${n}">`).join("")}</datalist>
     <datalist id="all-ex">${ALL.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
     <details class="card"><summary>Zasady planu v1.2</summary><ul>
@@ -982,7 +984,11 @@ document.addEventListener("click",async ev=>{
   if(b.id==="vib"){prefs.vib=!prefs.vib;savePrefs();vib(200);render();return}
   if(b.id==="add-ex"){draft.extras.push({ex:"",w:0,r:XEX.hi,sets:Array(XEX.sets).fill(null)}); saveDraft(); render(); const els=document.querySelectorAll("[data-name-for^='x']"); if(els.length) els[els.length-1].focus(); return}
   if(b.dataset.set){const it=itemOf(b.dataset.set),i=+b.dataset.i; if(it.sets[i]!=null){it.sets[i]=null;if(it.ws)it.ws[i]=null} else {if(restAt&&restDur-(Date.now()-restAt)/1000<=0)stopRest();it.sets[i]=it.r;it.ws=it.ws||[];it.ws[i]=it.w;if(!draft.start)draft.start=Date.now();const sl=slotOf(b.dataset.set);if(draft.type!=="Dom"&&roundDone(sl,i))startRest(sl?restFor(sl):90)} delete draft.auto; saveDraft(); render(); return}
-  if(b.id==="reset"){setTimeout(clearNotif,120);draft=newDraft(nextType(),false);draft.auto=true;saveDraft();render();return}
+  if(b.id==="reset"){
+    if(draftHasSets()&&!b.dataset.ok){b.dataset.ok=1;b.style.borderColor="var(--warn)";b.textContent=draft.editId?"Na pewno anulować? Zmiany przepadną – dotknij jeszcze raz":"Na pewno wyczyścić? Dotknij jeszcze raz";setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.style.borderColor="";b.textContent=draft.editId?"Anuluj edycję":"Wyczyść bieżący trening"}},4000);return}
+    if(draftHasSets()&&!draft.editId)ls.set("draftUndo",draft);
+    setTimeout(clearNotif,120);draft=newDraft(nextType(),false);draft.auto=true;saveDraft();render();return}
+  if(b.id==="undo-reset"){const u=ls.get("draftUndo",null);if(u){draft=u;saveDraft();ls.set("draftUndo",null);toast("Przywrócono trening");render()}return}
   if(b.id==="save"){
     if(savingNow) return;
     if(!draft.skipCheck&&!draft.checked&&incomplete().length){draft.checked=true;saveDraft();render();const el=document.getElementById("incomplete");if(el)el.scrollIntoView({block:"center"});return}
@@ -991,9 +997,9 @@ document.addEventListener("click",async ev=>{
     const editId=draft.editId;
     const entry={kind:"sila",type:draft.type,minimum:draft.type!=="Dom"&&draft.minimum,items,note:(draft.gym&&draft.type!=="Dom"?"@"+draft.gym+" | ":"")+(draft.note||""),durMin:editId?draft.durMin:(draft.start?Math.round((Date.now()-draft.start)/60000):0)};
     if(editId) entry.date=draft.editDate;
-    ls.del("draft"); draft=null; stopRest(); setTimeout(clearNotif,120);
-    try{if(editId){await removeEntry(editId)} await addEntry(entry); toast(editId?"Poprawiono trening w arkuszu":"Zapisano w arkuszu · "+items.length+" ćw.")}
-    catch(e){toast("Brak zasięgu · zapisane w telefonie, wyślę automatycznie")}
+    ls.del("draft"); ls.del("draftUndo"); draft=null; stopRest(); setTimeout(clearNotif,120);
+    try{await addEntry(entry); if(editId){await removeEntry(editId)} toast(editId?"Poprawiono trening w arkuszu":"Zapisano w arkuszu · "+items.length+" ćw.")}
+    catch(e){if(editId&&e&&e.queued){const pd=ls.get("pendingDel",[]);pd.push(editId);ls.set("pendingDel",pd);setEntries(entries.filter(x=>x.id!==editId))}toast("Brak zasięgu · zapisane w telefonie, wyślę automatycznie")}
     savingNow=false; render(); return}
   if(b.dataset.run){const f=bf(); f.t=b.dataset.run; if(f.t==="Test 5 km")f.km=5; ls.set("bieg-form",f); render(); return}
   if(b.id==="save-run"){const f=bf(); b.disabled=true; try{await addEntry({kind:"bieg",runType:f.t,km:f.km,min:f.min,hr:f.hr||null}); toast("Zapisano bieg w arkuszu")}catch(e){toast("Brak zasięgu · bieg czeka w kolejce")} render(); return}
