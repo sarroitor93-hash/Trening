@@ -353,7 +353,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list));
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list));
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -419,6 +419,12 @@ async function oneTimeFix7(list){
   for(const it of fixed.items){if(it.key==="biceps")it.ex="Uginanie bayesowskie – brama (oburącz)";if(it.key==="triceps"){it.ex="Prostowanie jednorącz nad głową – wyciąg";it.note="na rękę"}}
   fixed.items.push({key:"extra",ex:"Worek bokserski",mode:"time",min:15,sets:[],note:"średnia intensywność"});
   ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem 1.11: nazwy bicepsa i tricepsa, dopisany worek 15 min")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
+}
+async function oneTimeFix8(list){
+  const FIX="fix-04-11-czas"; if(ls.get(FIX,false)) return;
+  const e=list.find(x=>x.id==="smw1zehldesia"); if(!e||e.durMin>=30){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+(e.note||""); fixed.durMin=60;
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem czas treningu z 4.11: 60 min")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
