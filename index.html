@@ -568,7 +568,7 @@ function exBlock(ex,it,key,n,dom,extra){
       <button class="mini" data-skip="${key}">${extra?"Usuń":"Pomiń"}</button></span></div>
     ${chips}${nameIn}${noteBlock(key,it)}
     <div class="row">${stepper("w-"+key,it.w,unitLabel(ex,it))}<div class="reps">${stepper("r-"+key,it.r,ex.unitX==="sek"?"sek.":repUnit(it.ex))}</div></div>
-    <div class="sets">${it.sets.slice(0,n).map((v,i)=>`<button class="set num ${v!=null?"on":""}" data-set="${key}" data-i="${i}" aria-label="${dom?"Runda":"Seria"} ${i+1}">${v!=null?`${v}${ex.unit==="kg"&&it.ws&&it.ws[i]!=null?`<small>${fmt(it.ws[i])}</small>`:""}`:"·"}</button>`).join("")}</div>
+    <div class="sets">${it.sets.slice(0,n).map((v,i)=>`<button class="set num ${v!=null?"on":""}" data-set="${key}" data-i="${i}" aria-label="${dom?"Runda":"Seria"} ${i+1}">${v!=null?`${fmt(v)}${ex.unit==="kg"&&it.ws&&it.ws[i]!=null?`<small>${fmt(it.ws[i])}</small>`:""}`:"·"}</button>`).join("")}</div>
     <div class="meta num"><span>${lastTxt}</span>${up?`<span class="up">↑ dołóż ${fmt(ex.step)} kg</span>`:""}</div></div>`;
 }
 function renderSila(){
@@ -946,7 +946,7 @@ function bump(id,dir){
   if(id.startsWith("t-")){const f=id.slice(2),st=f==="rounds"?1:f==="work"&&tc.mode==="emom"?15:5;tc[f]=Math.max(f==="rest"?0:1,(tc[f]||0)+dir*st);saveTc();render();return}
   if(tab==="sila"&&id.startsWith("m-")){const it=itemOf(id.slice(2));it.min=Math.max(0,(it.min||0)+dir);saveDraft();render();return}
   if(tab==="sila"){const [kind,key]=id.split("-"),ex=findEx(key),it=itemOf(key);
-    if(kind==="w")it.w=Math.max(0,Math.round(((it.w||0)+dir*ex.step)*10)/10); else it.r=Math.max(1,(it.r||0)+dir*(repUnit(it.ex)==="sek."?5:1)); saveDraft()}
+    if(kind==="w")it.w=Math.max(0,Math.round(((it.w||0)+dir*ex.step)*10)/10); else{const st=repUnit(it.ex)==="sek."?5:1,c=it.r||0;it.r=Math.max(1,c%1?(dir>0?Math.ceil(c):Math.floor(c)):c+dir*st)} saveDraft()}
   else if(tab==="bieg"){const b=bf(); if(id==="km")b.km=Math.max(0,Math.round(((b.km||0)+dir*0.5)*10)/10); else if(id==="hr")b.hr=Math.max(0,(b.hr||140)+dir); else b.min=Math.max(0,(b.min||0)+dir); ls.set("bieg-form",b)}
   else if(tab==="pomiar"){const f=pf(); if(id==="kg")f.kg=Math.round(((f.kg||80)+dir*0.1)*10)/10; else {const lw=(entries.find(e=>e.kind==="pomiar"&&e.waist)||{}).waist||84; f.waist=f.waist==null?lw:Math.round((f.waist+dir*0.5)*10)/10;} ls.set("pom-form",f)}
   render();
@@ -1033,7 +1033,7 @@ document.addEventListener("change",ev=>{
   if(el.dataset.noteFor){const it=itemOf(el.dataset.noteFor);it.note=el.value.trim();saveDraft();return}
   if(el.id.startsWith("m-")){const it=itemOf(el.id.slice(2));const v2=parse(el.value);if(v2!=null)it.min=Math.max(0,v2);saveDraft();render();return}
   if(el.id.startsWith("t-")){const f=el.id.slice(2);if(v!=null)tc[f]=Math.max(f==="rest"?0:1,Math.round(v));saveTc();render();return}
-  if(tab==="sila"){const [kind,key]=el.id.split("-"),it=itemOf(key); if(v!=null){ if(kind==="w")it.w=Math.max(0,v); else it.r=Math.max(1,Math.round(v)); saveDraft() }}
+  if(tab==="sila"){const [kind,key]=el.id.split("-"),it=itemOf(key); if(v!=null){ if(kind==="w")it.w=Math.max(0,v); else it.r=Math.max(0.5,Math.round(v*2)/2); saveDraft() }}
   else if(tab==="bieg"){const b=bf(); if(v!=null) b[el.id]=v; ls.set("bieg-form",b)}
   else if(tab==="pomiar"){const f=pf(); f[el.id]=v; ls.set("pom-form",f)}
   render();
