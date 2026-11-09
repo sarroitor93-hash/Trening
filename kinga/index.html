@@ -42,7 +42,7 @@ h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.02e
 .gear{border:0;background:var(--surface-2);border-radius:999px;width:40px;height:40px;font-size:20px;line-height:1;color:var(--fg)}
 .sync{font-size:12px;color:var(--muted);text-align:right;border:0;background:none;padding:0}
 .sync.err{color:var(--danger)}
-.tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;background:var(--surface-2);border-radius:var(--r);padding:4px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface-2);border-radius:var(--r);padding:4px}
 .tabs button{border:0;background:transparent;border-radius:7px;padding:9px 0;font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 main{display:grid;gap:12px;padding-top:6px}
@@ -153,6 +153,7 @@ h1,.slot-h h2,.card h2{color:var(--head,var(--fg))}
   <div class="brand"><h1>Trening</h1><span class="brand-r"><button class="sync" id="sync">Wczytuję…</button><button class="gear" id="open-settings" aria-label="Ustawienia">⚙</button></span></div>
   <nav class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="trening">Trening</button>
+    <button role="tab" aria-selected="false" data-tab="pomiar">Pomiar</button>
     <button role="tab" aria-selected="false" data-tab="hist">Historia</button>
   </nav>
 </header>
@@ -214,7 +215,43 @@ const SLOTS=[
     E("Dead bug (na stronę)",8,12,{unit:"bw"}),
     E("Łódka (hollow hold)",15,30,{unit:"sek"})]}
 ];
-const SESS=["A","B","C"];
+// Trening w domu: gumy (power band, mini band) i hantle. Ok. 30 min, krótsze przerwy, bez skoków.
+const DOM=[
+  {id:"dpos",title:"Pośladki",sets:3,rest:60,ex:[
+    E("Mostek biodrowy z hantlą",12,20,{inc:2,step:1,wl:"kg · hantla na biodrach"}),
+    E("Hip thrust na kanapie z hantlą",12,20,{inc:2,step:1,wl:"kg · hantla na biodrach"}),
+    E("Mostek biodrowy jednonóż",10,15,{unit:"bw"}),
+    E("Mostek z mini bandem nad kolanami",15,20,{unit:"bw"})]},
+  {id:"dodw",title:"Odwodzenie",sets:3,rest:45,ex:[
+    E("Odwodzenie leżąc bokiem z mini bandem (na stronę)",15,20,{unit:"bw"}),
+    E("Muszelka z mini bandem (na stronę)",15,20,{unit:"bw"}),
+    E("Krok boczny z mini bandem (na stronę)",12,15,{unit:"bw"}),
+    E("Odwodzenie w staniu z mini bandem (na stronę)",12,15,{unit:"bw"})]},
+  {id:"dczw",title:"Przód uda",sets:3,rest:60,ex:[
+    E("Przysiad do krzesła z hantlą",12,15,{inc:2,step:1,wl:"kg · hantla przy klatce"}),
+    E("Wyprost kolana siedząc z gumą (na nogę)",15,20,{unit:"bw"}),
+    E("Przysiad z power bandem",12,15,{unit:"bw"}),
+    E("Wejście na niski stopień (na nogę)",10,12,{unit:"bw"})]},
+  {id:"ddwu",title:"Tył uda",sets:3,rest:60,ex:[
+    E("RDL z hantlami",12,15,{inc:2,step:1,wl:"kg · 1 hantla"}),
+    E("Uginanie nóg leżąc z gumą",12,20,{unit:"bw"}),
+    E("Mostek z piętami daleko",12,15,{unit:"bw"})]},
+  {id:"dple",title:"Plecy",sets:2,rest:45,ex:[
+    E("Wiosłowanie hantlą w opadzie (na rękę)",12,15,{inc:2,step:1,wl:"kg · 1 hantla"}),
+    E("Wiosłowanie z power bandem",12,20,{unit:"bw"}),
+    E("Rozciąganie gumy przed sobą (band pull-apart)",15,20,{unit:"bw"})]},
+  {id:"dkla",title:"Klatka",sets:2,rest:45,ex:[
+    E("Pompki na podwyższeniu",8,15,{unit:"bw"}),
+    E("Wyciskanie hantli leżąc na podłodze",12,15,{inc:2,step:1,wl:"kg · 1 hantla"}),
+    E("Pompki na kolanach",8,15,{unit:"bw"})]},
+  {id:"dbrz",title:"Brzuch",sets:2,rest:30,opt:true,ex:[
+    E("Deska",20,40,{unit:"sek"}),
+    E("Deska bokiem (na stronę)",20,40,{unit:"sek"}),
+    E("Dead bug (na stronę)",8,12,{unit:"bw"}),
+    E("Łódka (hollow hold)",15,30,{unit:"sek"})]}
+];
+const SESS=["A","B","C"],TYPES=["A","B","C","Dom"];
+const slotsOf=type=>type==="Dom"?DOM:SLOTS;
 const CARDIO=["Rower","Bieżnia pod górę","Orbitrek"];
 const findEx=(sl,name)=>sl.ex.find(e=>e.n===name)||Object.assign({},sl.ex[0],{n:name,custom:true});
 
@@ -228,7 +265,7 @@ if(DEMO&&!ls.get("cache",null)){const d=n=>new Date(Date.now()-n*864e5).toISOStr
   ls.set("cache",[{id:"d2",date:d(6),type:"B",minimum:false,note:"",items:[it("Pośladki","Hip thrust ze sztangą",30,[12,12,11],"srednio"),it("Przód uda","Wyprost nóg na maszynie",25,[15,14,13],"lekko"),it("Tył uda","Uginanie nóg leżąc",20,[12,11,10],"ciezko"),it("Klatka","Wyciskanie na skosie na maszynie",15,[12,12,12],"srednio"),it("Plecy","Wiosłowanie na maszynie z oparciem",30,[12,12,11],"srednio")]},
     {id:"d1",date:d(3),type:"A",minimum:false,note:"",items:[it("Pośladki","Hip thrust na maszynie",40,[12,12,12],"lekko"),it("Przód uda","Suwnica 45°",60,[12,11,10],"srednio"),it("Tył uda","Uginanie nóg siedząc",20,[9,8,8],"ciezko"),it("Klatka","Wyciskanie siedząc na maszynie",15,[12,12,12],"srednio"),it("Plecy","Ściąganie drążka do klatki",25,[12,12,12],"lekko")]}])}
 const ready=()=>!!(cfg.url&&cfg.key);
-let prefs=Object.assign({snd:true},ls.get("prefs",{}));
+let prefs=Object.assign({vol:"sredni"},ls.get("prefs",{}));if(prefs.snd===false&&!prefs.volSet)prefs.vol="off";
 
 const THEMES=[["czarny-roz","Czarny + róż","#ff4fa0"],["czarny-zloto","Czarny + złoto","#e8c26a"],["czarny-mieta","Czarny + mięta","#4fe3b4"],["czarny-fiolet","Czarny + fiolet","#b38cff"],["czarny-czerwien","Czarny + czerwień","#ff4d5e"],["morska","Morska","#2f7d6d"],["malina","Malinowa","#c2185b"],["lawenda","Lawendowa","#6a4fb3"],["granat","Granatowa","#1f4e8c"],["koral","Koralowa","#d0543a"],["grafit","Grafitowa","#2b2f33"]];
 function applyTheme(){const r=document.documentElement;r.dataset.theme=prefs.theme||"czarny-roz";if(prefs.mode==="light")r.dataset.mode="light";else delete r.dataset.mode;
@@ -251,6 +288,10 @@ function rowsOf(e){
       .concat([it.min!=null?"":tot,it.feel?FEEL[it.feel]:"",it.min!=null?it.min:"",it.note||"",idx===0?(e.note||""):"",e.id,varied?wl.join("/"):""]);
   });
 }
+const MHEAD=["Data","Masa (kg)","Talia (cm)","Biodra (cm)","Udo (cm)","ID"];
+const MF=[["kg","Masa","kg",0.1],["talia","Talia","cm",0.5],["biodra","Biodra","cm",0.5],["udo","Udo","cm",0.5]];
+function mRows(e){return [[sDate(e.date)].concat(MF.map(([k])=>e[k]==null?"":e[k])).concat([e.id])]}
+function fromMeas(rows){return (rows||[]).filter(r=>r[5]).map(r=>{const e={id:String(r[5]),kind:"pomiar",date:String(r[0]).replace(" ","T")};MF.forEach(([k],i)=>{const v=r[i+1];e[k]=v===""||v==null?null:Number(v)});return e})}
 function fromRows(rows){
   const by={},out=[];
   for(const r of rows||[]){
@@ -268,9 +309,10 @@ function fromRows(rows){
 
 const api={
   async data(){
-    const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key));const j=await r.json();if(!j.ok)throw new Error(j.error);return j.rows||[]},
+    const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key));const j=await r.json();if(!j.ok)throw new Error(j.error);
+    if(!("meas" in j))ls.set("oldScript",true);else ls.del("oldScript");return fromRows(j.rows).concat(fromMeas(j.meas))},
   async save(e){
-    const r=await fetch(cfg.url,{method:"POST",body:JSON.stringify({key:cfg.key,action:"save",id:e.id,rows:rowsOf(e)})});const j=await r.json();if(!j.ok)throw new Error(j.error||"zapis")},
+    const r=await fetch(cfg.url,{method:"POST",body:JSON.stringify({key:cfg.key,action:"save",id:e.id,tab:e.kind==="pomiar"?"Pomiary":"Treningi",rows:e.kind==="pomiar"?mRows(e):rowsOf(e)})});const j=await r.json();if(!j.ok)throw new Error(j.error||"zapis")},
   async del(eid){
     const r=await fetch(cfg.url,{method:"POST",body:JSON.stringify({key:cfg.key,action:"delete",id:eid})});const j=await r.json();if(!j.ok)throw new Error(j.error||"usuwanie")}
 };
@@ -285,7 +327,7 @@ let lastErr="",flushing=null;
 function flush(){if(!flushing)flushing=doFlush().finally(()=>{flushing=null});return flushing}
 async function doFlush(){
   if(!ready()||!navigator.onLine)return syncLabel();
-  for(const e of queue()){try{await api.save(e);const c=ls.get("cache",[]);if(!c.some(x=>x.id===e.id))ls.set("cache",c.concat([e]));ls.set("queue",queue().filter(x=>x.id!==e.id));lastErr=""}catch(err){lastErr=String(err&&err.message||err);break}}
+  for(const e of queue()){if(e.kind==="pomiar"&&ls.get("oldScript",false))continue;try{await api.save(e);const c=ls.get("cache",[]);if(!c.some(x=>x.id===e.id))ls.set("cache",c.concat([e]));ls.set("queue",queue().filter(x=>x.id!==e.id));lastErr=""}catch(err){lastErr=String(err&&err.message||err);break}}
   for(const id of ls.get("pendingDel",[])){try{await api.del(id);ls.set("pendingDel",ls.get("pendingDel",[]).filter(x=>x!==id));ls.set("cache",ls.get("cache",[]).filter(x=>x.id!==id))}catch(err){break}}
   syncLabel()}
 function setSync(t,err){const el=$("#sync");el.textContent=t;el.classList.toggle("err",!!err)}
@@ -298,7 +340,7 @@ async function load(){
   setEntries(ls.get("cache",[]));
   if(!ready()){syncLabel();return}
   await flush();
-  try{const list=fromRows(await api.data());ls.set("cache",list);setEntries(list);syncLabel()}
+  try{const list=await api.data();ls.set("cache",list);setEntries(list);syncLabel()}
   catch(e){setSync(navigator.onLine?"Brak połączenia z arkuszem":"Offline · dane z telefonu",true)}
 }
 
@@ -310,7 +352,8 @@ function suggest(ex,last){
   if(!last)return {w:ex.unit==="kg"?null:undefined,r:ex.unit==="kg"?ex.lo:ex.lo,txt:"Pierwszy raz: dobierz ciężar tak, żeby było „średnio”",dir:0};
   const done=(last.sets||[]).filter(x=>x!=null),minR=Math.min(...done),maxR=Math.max(...done),f=last.feel;
   if(ex.unit!=="kg"){const add=ex.unit==="sek"?(f==="lekko"?10:f==="srednio"?5:0):(f==="lekko"?2:f==="srednio"?1:0);
-    const r=Math.min(Math.max(maxR+add,ex.lo),ex.unit==="sek"?120:30);return {r,txt:add?`↑ dziś ${r} ${ex.unit==="sek"?"s":"powt."} (ost. ${maxR}, ${FEEL[f].toLowerCase()})`:`Dziś jak ostatnio: ${maxR}`,dir:add?1:0}}
+    if(ex.unit==="bw"&&add&&maxR>=ex.hi)return {r:ex.lo,txt:`↑ mocniejsza guma albo trudniejsza wersja (ost. ${maxR} powt., ${FEEL[f].toLowerCase()})`,dir:1};
+    const r=Math.min(Math.max(maxR+add,ex.lo),ex.unit==="sek"?120:Math.max(30,ex.hi));return {r,txt:add?`↑ dziś ${r} ${ex.unit==="sek"?"s":"powt."} (ost. ${maxR}, ${FEEL[f].toLowerCase()})`:`Dziś jak ostatnio: ${maxR}`,dir:add?1:0}}
   const w0=topW(last),sgn=ex.assist?-1:1,below=minR<ex.lo;
   let k=0,why="";
   if(below&&f==="ciezko"){k=-1;why="za mało powtórzeń i ciężko"}
@@ -326,7 +369,7 @@ function suggest(ex,last){
   return {w,r,txt:word+" ("+why+")",dir:k>0?1:k<0?-1:0};
 }
 function firstDate(){const w=workouts();return w.length?new Date(w[w.length-1].date).getTime():null}
-function nextType(){const w=workouts()[0];if(!w)return "A";const i=SESS.indexOf(w.type);return i<0?"A":SESS[(i+1)%SESS.length]}
+function nextType(){const w=workouts().find(e=>SESS.includes(e.type));if(!w)return "A";const i=SESS.indexOf(w.type);return i<0?"A":SESS[(i+1)%SESS.length]}
 
 // ---------- Bieżący trening ----------
 let draft=ls.get("draft",null);
@@ -335,10 +378,10 @@ function setsFor(sl){return sl.sets}
 function freshItem(sl,ex){const last=lastFor(ex.n),s=suggest(ex,last);
   return {ex:ex.n,w:ex.unit==="kg"?(s.w==null?0:s.w):null,r:s.r,sets:[],ws:[],feel:null,note:"",plus:0,skip:!!sl.opt}}
 function newDraft(type,minimum){const d={id:"k"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),type,minimum:!!minimum,note:"",items:{},extras:[],cardio:null,start:null};
-  const vi=SESS.indexOf(type);
-  for(const sl of SLOTS){const ex=sl.ex[Math.min(vi,sl.ex.length-1)];d.items[sl.id]=freshItem(sl,ex)}return d}
+  const vi=Math.max(0,SESS.indexOf(type));
+  for(const sl of slotsOf(type)){const ex=sl.ex[Math.min(vi,sl.ex.length-1)];d.items[sl.id]=freshItem(sl,ex)}return d}
 function draftHasSets(){return !!draft&&(Object.values(draft.items).some(i=>!i.skip&&i.sets.some(x=>x!=null))||draft.extras.some(i=>i.sets.some(x=>x!=null))||!!(draft.cardio&&draft.cardio.min>0))}
-function activeSlots(){return SLOTS.filter(sl=>!(draft.minimum&&!sl.min))}
+function activeSlots(){return slotsOf(draft.type).filter(sl=>!(draft.minimum&&draft.type!=="Dom"&&!sl.min))}
 function nItem(sl,it){return setsFor(sl)+(it.plus||0)}
 function nextUp(){for(const sl of activeSlots()){const it=draft.items[sl.id];if(it.skip)continue;const n=nItem(sl,it),d=it.sets.slice(0,n).filter(x=>x!=null).length;if(d<n)return it.ex+" · seria "+(d+1)+"/"+n}return null}
 
@@ -347,7 +390,7 @@ let restCfg=ls.get("rest",{});
 const restFor=(sl,name)=>restCfg[name]!=null?restCfg[name]:(sl?sl.rest:90);
 let restAt=null,restDur=0,restTick=null,actx=null,overBeeped=-1,wake=null;
 function audio(){try{if("audioSession" in navigator)navigator.audioSession.type=prefs.loud?"playback":"auto"}catch(e){}try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}}
-function beep(f,ms){try{if(!actx||!prefs.snd)return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.35,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
+function beep(f,ms){try{if(!actx||prefs.vol==="off")return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);const v=prefs.vol==="cicho"?.06:prefs.vol==="glosno"?.8:.3;if(prefs.vol==="glosno")o.type="square";g.gain.setValueAtTime(v,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
 async function keepAwake(){try{if("wakeLock" in navigator&&!wake){wake=await navigator.wakeLock.request("screen");wake.addEventListener("release",()=>{wake=null})}}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&restAt)keepAwake()});
 function startRest(sec){audio();keepAwake();restAt=Date.now();restDur=sec;overBeeped=-1;drawRest.last=null;$("#rest").hidden=false;if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
@@ -395,9 +438,9 @@ function slotBlock(sl,key,it,extra){
 function renderTrening(){
   if(!draft){draft=newDraft(nextType(),false);draft.auto="next";ls.set("draft",draft)}
   const nt=nextType();
-  let h=`<div class="bar"><div class="seg" role="group" aria-label="Trening">${SESS.map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
-    <button class="tog" id="minimum" aria-pressed="${draft.minimum}">${draft.minimum?"Minimum · ok. 30 min":"Wersja minimum"}</button></div>
-    <p class="hint">${draft.minimum?"Minimum: same nogi. Lepsze niż nic.":"Kolejny w kolejce: <b>"+nt+"</b>."} Bez walki do upadku: zostaw 1–2 powtórzenia w zapasie.</p>`;
+  let h=`<div class="bar"><div class="seg" role="group" aria-label="Trening">${TYPES.map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
+    ${draft.type==="Dom"?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">${draft.minimum?"Minimum · ok. 30 min":"Minimum"}</button>`}</div>
+    <p class="hint">${draft.type==="Dom"?"Trening w domu, ok. 30 min: gumy i hantle, krótkie przerwy. Nie przesuwa kolejki A → B → C.":draft.minimum?"Minimum: same nogi. Lepsze niż nic.":"Kolejny w kolejce: <b>"+nt+"</b>."} Bez walki do upadku: zostaw 1–2 powtórzenia w zapasie.</p>`;
   if(draft.start&&draftHasSets())h+=`<p class="hint num">Trening trwa: <b>${mmss((Date.now()-draft.start)/1000)}</b></p>`;
   for(const sl of activeSlots())h+=slotBlock(sl,sl.id,draft.items[sl.id],false);
   draft.extras.forEach((x,i)=>{h+=slotBlock(null,"x"+i,x,true)});
@@ -435,10 +478,33 @@ function renderHist(){
       <ul>${e.items.map(i=>`<li>${esc(i.ex)}: ${i.min!=null?fmt(i.min)+" min":(topW(i)>0?((i.ws||[]).filter(x=>x!=null).length>1&&new Set((i.ws||[]).filter(x=>x!=null)).size>1?i.ws.filter(x=>x!=null).map(fmt).join("/"):fmt(topW(i)))+" kg × ":"")+(i.sets||[]).filter(x=>x!=null).join("/")}${i.feel?" · "+FEEL[i.feel].toLowerCase():""}${i.note?" · „"+esc(i.note)+"”":""}</li>`).join("")}</ul>${e.note?`<p class="hint">„${esc(e.note)}”</p>`:""}</div>`}
   return h+`</section>`;
 }
+function nowLocal(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes())}
+const meas=()=>entries.filter(e=>e.kind==="pomiar");
+function renderPomiar(){
+  const M=meas(),last=M[0]||{},f=ls.get("pform",null)||{};
+  for(const [k] of MF)if(!(k in f))f[k]=k==="kg"?(last.kg!=null?last.kg:60):null;
+  let h=`<section class="card"><h2>Pomiar</h2>
+    <p class="hint">Waga rano, na czczo, po toalecie. Obwody raz w tygodniu, w tym samym miejscu: talia na wysokości pępka, biodra w najszerszym miejscu pośladków, udo w połowie długości. Obwody są opcjonalne: puste pole = brak pomiaru, dotknij + żeby zacząć od ostatniej wartości.</p>
+    ${ls.get("oldScript",false)?`<p class="hint" style="color:var(--warn);font-weight:600">Skrypt w arkuszu jest w starej wersji. Pomiary czekają w telefonie, dopóki Igor go nie zaktualizuje.</p>`:""}
+    <div class="row" style="grid-template-columns:1fr 1fr">${MF.map(([k,l,u])=>stepper("m-"+k,f[k],l+" · "+u)).join("")}</div>
+    <label class="lbl" for="mdt">Data i godzina</label><input class="name" type="datetime-local" id="mdt" value="${esc(f.dt||nowLocal())}">
+    <button class="primary" id="save-m">Zapisz pomiar</button></section>`;
+  // średnia tygodniowa masy (waga skacze z dnia na dzień)
+  const wk=[0,1].map(n=>{const a=Date.now()-(n+1)*7*864e5,b=Date.now()-n*7*864e5,v=M.filter(e=>e.kg!=null&&new Date(e.date)>=a&&new Date(e.date)<b).map(e=>e.kg);return v.length?v.reduce((x,y)=>x+y,0)/v.length:null});
+  const first=M.length?M[M.length-1]:null;
+  if(M.length)h+=`<section class="card"><h2>Zmiany</h2><table class="num"><thead><tr><th></th><th class="r">Start</th><th class="r">Teraz</th><th class="r">Różnica</th></tr></thead><tbody>
+    ${MF.map(([k,l,u])=>{const a=M.slice().reverse().find(e=>e[k]!=null),b=M.find(e=>e[k]!=null);if(!a)return "";const d=Math.round((b[k]-a[k])*10)/10;return `<tr><td>${l}</td><td class="r">${fmt(a[k])}</td><td class="r">${fmt(b[k])}</td><td class="r">${d>0?"+":""}${fmt(d)} ${u}</td></tr>`}).join("")}</tbody></table>
+    <p class="hint">Średnia masa z 7 dni: <b>${wk[0]!=null?fmt(wk[0])+" kg":"—"}</b>${wk[0]!=null&&wk[1]!=null?` (tydzień wcześniej ${fmt(wk[1])} kg)`:""}. Pojedynczy dzień nic nie znaczy, patrz na średnią.</p></section>`;
+  h+=`<section class="card"><h2>Ostatnie pomiary</h2>`;
+  if(!M.length)h+=`<p class="empty">Jeszcze nic.</p>`;
+  for(const e of M.slice(0,30)){const d=new Date(e.date);
+    h+=`<div class="entry"><div class="entry-h"><span class="num">${MF.filter(([k])=>e[k]!=null).map(([k,l,u])=>`${l.toLowerCase()} ${fmt(e[k])} ${u}`).join(" · ")}</span><span class="num" style="font-size:13px;color:var(--muted);white-space:nowrap">${d.toLocaleDateString("pl-PL",{day:"numeric",month:"short"})} ${armed===e.id?`Usunąć? <button class="del arm" data-del="${esc(e.id)}">Tak</button><button class="del" data-cancel="1">Nie</button>`:`<button class="del" data-arm="${esc(e.id)}">Usuń</button>`}</span></div></div>`}
+  return h+`</section>`}
 function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
   <span class="lbl">Kolor</span><div class="chips" style="flex-wrap:wrap">${THEMES.map(([k,l,c])=>`<button class="chip" data-theme="${k}" aria-pressed="${(prefs.theme||"czarny-roz")===k}"><span class="swatch" style="background:${c}"></span>${l}</button>`).join("")}</div>
   ${(prefs.theme||"czarny-roz").startsWith("czarny")?"":`<span class="lbl">Tryb</span><div class="chips" style="flex-wrap:wrap"><button class="chip" data-mode="auto" aria-pressed="${prefs.mode!=="light"}">Jak w telefonie (jasny/ciemny)</button><button class="chip" data-mode="light" aria-pressed="${prefs.mode==="light"}">Zawsze jasny</button></div>`}
-  <span class="lbl">Dźwięk końca przerwy</span><div class="chips"><button class="chip" id="snd" aria-pressed="${prefs.snd}">${prefs.snd?"Włączony":"Wyłączony"}</button></div>
+  <span class="lbl">Głośność sygnału przerwy</span><div class="chips" style="flex-wrap:wrap">${[["off","Wyłączony"],["cicho","Cichy"],["sredni","Średni"],["glosno","Głośny"]].map(([k,l])=>`<button class="chip" data-vol="${k}" aria-pressed="${prefs.vol===k}">${l}</button>`).join("")}</div>
+  <p class="hint">To głośność względem głośności telefonu. Przyciski głośności w iPhonie dalej działają.</p>
   <span class="lbl">Gdy telefon jest wyciszony</span><div class="chips"><button class="chip" id="loud" aria-pressed="${!!prefs.loud}">${prefs.loud?"Graj mimo wyciszenia":"Nie graj"}</button></div>
   <p class="hint">„Graj mimo wyciszenia” działa na iPhonie także przy przełączniku wyciszenia, ale zatrzymuje muzykę z innych aplikacji (np. Spotify). Dźwięk gra tylko przy włączonym ekranie: aplikacja próbuje nie wygaszać ekranu w trakcie przerwy.</p></section>
   ${renderConn()}<button class="primary" id="close-settings">Gotowe</button>`}
@@ -448,14 +514,16 @@ function renderConn(){return `<section class="card"><h2>Arkusz Google</h2>
   <input class="name" id="cfg-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url||"")}">
   <input class="name" id="cfg-key" placeholder="Klucz" value="${esc(cfg.key||"")}"><button class="ghost" id="cfg-save">Połącz</button></div></details></section>`}
 function render(){const y=window.scrollY;
-  $("#main").innerHTML=showSettings?renderSettings():tab==="hist"?renderHist():renderTrening();
+  $("#main").innerHTML=showSettings?renderSettings():tab==="hist"?renderHist():tab==="pomiar"?renderPomiar():renderTrening();
   window.scrollTo(0,y)}
 
 // ---------- Zdarzenia ----------
 const itemOf=key=>key[0]==="x"?draft.extras[+key.slice(1)]:draft.items[key];
-const slotOf=key=>SLOTS.find(s=>s.id===key)||null;
+const slotOf=key=>(draft?slotsOf(draft.type):SLOTS).find(s=>s.id===key)||null;
 const exOf=key=>key[0]==="x"?E("",10,12):findEx(slotOf(key),itemOf(key).ex);
 function bump(id,dir){
+  if(id.startsWith("m-")){const k=id.slice(2),f=ls.get("pform",{}),def=MF.find(x=>x[0]===k),last=meas().find(e=>e[k]!=null);
+    if(f[k]==null&&k!=="kg")f[k]=last?last[k]:(k==="talia"?70:k==="biodra"?95:55);else{if(f[k]==null)f[k]=last&&last.kg!=null?last.kg:60; f[k]=Math.max(0,Math.round((f[k]+dir*def[3])*10)/10)}ls.set("pform",f);render();return}
   if(id==="c-min"){draft.cardio.min=Math.max(0,(draft.cardio.min||0)+dir);saveDraft();render();return}
   const [kind,key]=id.split("-"),it=itemOf(key),ex=exOf(key);
   if(kind==="w")it.w=Math.max(0,Math.round(((it.w||0)+dir*ex.step)*10)/10);
@@ -465,6 +533,8 @@ document.addEventListener("change",ev=>{const t=ev.target;
   if(t.id==="wnote"){draft.note=t.value;saveDraft();return}
   if(t.dataset.noteFor){itemOf(t.dataset.noteFor).note=t.value;saveDraft();return}
   if(t.dataset.nameFor){const it=itemOf(t.dataset.nameFor);it.ex=t.value.trim();saveDraft();render();return}
+  if(t.id==="mdt"){const f=ls.get("pform",{});f.dt=t.value;ls.set("pform",f);return}
+  if(/^m-/.test(t.id)){const f=ls.get("pform",{}),v=parse(t.value);f[t.id.slice(2)]=v;ls.set("pform",f);return}
   if(/^[wr]-/.test(t.id)||t.id==="c-min"){const v=parse(t.value);if(t.id==="c-min"){draft.cardio.min=v||0}else{const [k,key]=t.id.split("-"),it=itemOf(key);if(k==="w")it.w=v==null?0:Math.max(0,v);else it.r=v==null?it.r:Math.max(1,Math.round(v*2)/2)}saveDraft();render()}});
 document.addEventListener("click",async ev=>{
   const b=ev.target.closest("button");if(!b)return;
@@ -478,12 +548,16 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.theme){prefs.theme=b.dataset.theme;ls.set("prefs",prefs);applyTheme();render();return}
   if(b.dataset.mode){prefs.mode=b.dataset.mode;ls.set("prefs",prefs);applyTheme();render();return}
   if(b.id==="loud"){prefs.loud=!prefs.loud;ls.set("prefs",prefs);audio();beep(880,200);render();return}
-  if(b.id==="snd"){prefs.snd=!prefs.snd;ls.set("prefs",prefs);audio();beep(880,200);render();return}
+  if(b.dataset.vol){prefs.vol=b.dataset.vol;prefs.volSet=true;ls.set("prefs",prefs);audio();beep(880,250);render();return}
   if(b.dataset.arm){armed=b.dataset.arm;render();return}
   if(b.dataset.cancel){armed=null;render();return}
   if(b.dataset.del){const id=b.dataset.del;armed=null;
     if(queue().some(e=>e.id===id))ls.set("queue",queue().filter(e=>e.id!==id));else{const pd=ls.get("pendingDel",[]);pd.push(id);ls.set("pendingDel",pd)}
     setEntries(ls.get("cache",[]));toast("Usunięto");flush();return}
+  if(b.id==="save-m"){const f=ls.get("pform",{}),cur=MF.reduce((o,[k])=>{const el=$("#m-"+k);o[k]=el?parse(el.value):null;return o},{});
+    if(MF.every(([k])=>cur[k]==null)){toast("Wpisz przynajmniej jedną wartość");return}
+    const dt=($("#mdt")||{}).value;const e=Object.assign({id:"m"+Date.now().toString(36),kind:"pomiar",date:dt?new Date(dt).toISOString():new Date().toISOString()},cur);
+    ls.set("queue",queue().concat([e]));ls.set("pform",{kg:cur.kg});setEntries(ls.get("cache",[]));toast("Zapisano pomiar");await flush();return}
   if(tab!=="trening"||!draft)return;
   if(b.dataset.type){if(b.dataset.type===draft.type)return;if(draftHasSets()){toast("Masz niezapisane serie. Zapisz albo wyczyść trening.");return}draft=newDraft(b.dataset.type,draft.minimum);draft.auto=true;ls.set("draft",draft);render();return}
   if(b.id==="minimum"){draft.minimum=!draft.minimum;ls.set("draft",draft);render();return}
