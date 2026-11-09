@@ -144,6 +144,7 @@ html[data-mode="light"]{color-scheme:light}
     <button role="tab" aria-selected="false" data-tab="hist">Historia</button>
   </nav>
 </header>
+<p id="demo" class="hint" hidden style="background:var(--warn-bg);color:var(--warn);padding:8px 10px;border-radius:8px;font-weight:600">Podgląd: przykładowe dane, nic nie zapisuje się do arkusza.</p>
 <main id="main"></main>
 </div>
 <div class="rest" id="rest" hidden><div><div class="l" id="rest-l">Przerwa</div><div class="t num" id="rest-t">0:00</div></div><div class="rest-b"><button class="ghost" id="rest-m">−15 s</button><button class="ghost" id="rest-p">+15 s</button><button class="ghost" id="rest-x"><b>Stop</b></button></div></div>
@@ -156,7 +157,10 @@ const $=s=>document.querySelector(s);
 const fmt=n=>(Math.round(n*10)/10).toString().replace(".",",");
 const parse=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:null};
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+// Własna przestrzeń w pamięci telefonu: aplikacja Igora działa pod tym samym adresem, więc klucze muszą się różnić.
+const DEMO=/[?&]demo\b/.test(location.search);
+const NS=DEMO?"kdemo:":"kinga:";
+const ls={get(k,d){try{const v=localStorage.getItem(NS+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(NS+k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(NS+k)}catch(e){}}};
 
 // ---------- Plan ----------
 // Każdy slot: lista wersji. Trening A bierze wersję 1, B – 2, C – 3. Zajęta maszyna: dotknij innej wersji.
@@ -206,7 +210,11 @@ const findEx=(sl,name)=>sl.ex.find(e=>e.n===name)||Object.assign({},sl.ex[0],{n:
 // Adres skryptu Google (Apps Script) i klucz. Wpisane na stałe, żeby na telefonie nic nie trzeba było ustawiać.
 const SCRIPT_URL="https://script.google.com/macros/s/AKfycbz8pgya73F2SDVHZSkbDn1WtSOZhL0LWln9W9B9LWvuQ-DIhJg46tU_-gSWxUMgUn4/exec";
 const SCRIPT_KEY="uCLJkHkzxkxJQQIm";
-let cfg=(c=>c&&c.url&&c.key?c:{url:SCRIPT_URL,key:SCRIPT_KEY})(ls.get("cfg",null));
+let cfg=DEMO?{}:(c=>c&&c.url&&c.key?c:{url:SCRIPT_URL,key:SCRIPT_KEY})(ls.get("cfg",null));
+// Podgląd: przykładowa historia, żeby było widać podpowiedzi. Nic nie trafia do arkusza.
+if(DEMO&&!ls.get("cache",null)){const d=n=>new Date(Date.now()-n*864e5).toISOString(),it=(slot,ex,w,sets,feel)=>({slot,ex,w,sets,ws:sets.map(()=>w),feel,note:""});
+  ls.set("cache",[{id:"d2",date:d(6),type:"B",minimum:false,note:"",items:[it("Pośladki","Hip thrust ze sztangą",30,[12,12,11],"srednio"),it("Przód uda","Wyprost nóg na maszynie",25,[15,14,13],"lekko"),it("Tył uda","Uginanie nóg leżąc",20,[12,11,10],"ciezko"),it("Klatka","Wyciskanie na skosie na maszynie",15,[12,12,12],"srednio"),it("Plecy","Wiosłowanie na maszynie z oparciem",30,[12,12,11],"srednio")]},
+    {id:"d1",date:d(3),type:"A",minimum:false,note:"",items:[it("Pośladki","Hip thrust na maszynie",40,[12,12,12],"lekko"),it("Przód uda","Suwnica 45°",60,[12,11,10],"srednio"),it("Tył uda","Uginanie nóg siedząc",20,[9,8,8],"ciezko"),it("Klatka","Wyciskanie siedząc na maszynie",15,[12,12,12],"srednio"),it("Plecy","Ściąganie drążka do klatki",25,[12,12,12],"lekko")]}])}
 const ready=()=>!!(cfg.url&&cfg.key);
 let prefs=Object.assign({snd:true},ls.get("prefs",{}));
 
@@ -214,6 +222,7 @@ const THEMES=[["morska","Morska","#2f7d6d"],["malina","Malinowa","#c2185b"],["la
 function applyTheme(){const r=document.documentElement;r.dataset.theme=prefs.theme||"morska";if(prefs.mode==="light")r.dataset.mode="light";else delete r.dataset.mode;
   const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=(THEMES.find(t=>t[0]===(prefs.theme||"morska"))||THEMES[0])[2]}
 applyTheme();
+if(DEMO)document.getElementById("demo").hidden=false;
 
 // ---------- Arkusz: wiersz = jedno ćwiczenie ----------
 const HEAD=["Data","Trening","Wersja","Partia","Ćwiczenie","Ciężar (kg)","Seria 1","Seria 2","Seria 3","Seria 4","Seria 5","Powt./sek. razem","Ocena","Czas (min)","Notatka ćw.","Notatka treningu","ID","Ciężary serii (kg)"];
@@ -269,6 +278,7 @@ async function doFlush(){
   syncLabel()}
 function setSync(t,err){const el=$("#sync");el.textContent=t;el.classList.toggle("err",!!err)}
 function syncLabel(){const q=queue().length+ls.get("pendingDel",[]).length;
+  if(DEMO)return setSync("Podgląd",false);
   if(!ready())return setSync("Nie połączono",true);
   if(!navigator.onLine)return setSync(q?"Offline · "+q+" czeka":"Offline",!!q);
   setSync(q?q+" czeka"+(lastErr?" · "+lastErr.slice(0,40):""):"Zapisane w arkuszu",!!q)}
