@@ -21,7 +21,7 @@
   --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif; --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --r:10px; color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
+@media (prefers-color-scheme:dark){html:not([data-mode="light"]){
   --bg:#0f1414; --surface:#171d1d; --surface-2:#212929; --fg:#e7eeec; --muted:#97a5a3; --line:#2b3535;
   --accent:#5cc3ad; --accent-fg:#06201a; --done:#4cc785; --done-bg:#16301f; --warn:#f0b04a; --warn-bg:#33270f; --danger:#f28b82; color-scheme:dark}}
 *{box-sizing:border-box}
@@ -119,6 +119,20 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:14px;z-index:7;max-width:calc(100% - 32px);text-align:center}
 .warnbox{border-color:var(--warn)}
 @media (prefers-reduced-motion:no-preference){.set,.chip,.feel button,.tabs button{transition:background .12s,color .12s,border-color .12s}}
+/* Motywy kolorystyczne (wybór w ustawieniach). Zmieniają tylko akcent; tło i tekst zostają czytelne. */
+html[data-theme="malina"]{--accent:#c2185b;--surface-2:#f1e3e9;--bg:#f7eef1;--line:#e6d2da}
+html[data-theme="lawenda"]{--accent:#6a4fb3;--surface-2:#e8e3f3;--bg:#f2eff8;--line:#dbd3ec}
+html[data-theme="granat"]{--accent:#1f4e8c;--surface-2:#e1e7ef;--bg:#eef2f6;--line:#d0d9e4}
+html[data-theme="koral"]{--accent:#d0543a;--surface-2:#f3e4df;--bg:#f9f0ec;--line:#ecd5cd}
+html[data-theme="grafit"]{--accent:#2b2f33;--surface-2:#e6e6e6;--bg:#f2f2f2;--line:#d6d6d6}
+@media (prefers-color-scheme:dark){
+ html[data-theme="malina"]:not([data-mode="light"]){--accent:#f06292;--accent-fg:#2a0612;--surface-2:#2a2025;--bg:#151012;--line:#3a2c32}
+ html[data-theme="lawenda"]:not([data-mode="light"]){--accent:#b39ddb;--accent-fg:#1a1030;--surface-2:#252130;--bg:#121017;--line:#352f45}
+ html[data-theme="granat"]:not([data-mode="light"]){--accent:#7fa8e6;--accent-fg:#0b1830;--surface-2:#1f2530;--bg:#0f1218;--line:#2c3443}
+ html[data-theme="koral"]:not([data-mode="light"]){--accent:#ff8a70;--accent-fg:#2a0c05;--surface-2:#2b2220;--bg:#161110;--line:#3d302c}
+ html[data-theme="grafit"]:not([data-mode="light"]){--accent:#e0e0e0;--accent-fg:#111;--surface-2:#252525;--bg:#111;--line:#333}}
+html[data-mode="light"]{color-scheme:light}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
 </style>
 </head>
 <body>
@@ -195,6 +209,11 @@ const SCRIPT_KEY="uCLJkHkzxkxJQQIm";
 let cfg=(c=>c&&c.url&&c.key?c:{url:SCRIPT_URL,key:SCRIPT_KEY})(ls.get("cfg",null));
 const ready=()=>!!(cfg.url&&cfg.key);
 let prefs=Object.assign({snd:true},ls.get("prefs",{}));
+
+const THEMES=[["morska","Morska","#2f7d6d"],["malina","Malinowa","#c2185b"],["lawenda","Lawendowa","#6a4fb3"],["granat","Granatowa","#1f4e8c"],["koral","Koralowa","#d0543a"],["grafit","Grafitowa","#2b2f33"]];
+function applyTheme(){const r=document.documentElement;r.dataset.theme=prefs.theme||"morska";if(prefs.mode==="light")r.dataset.mode="light";else delete r.dataset.mode;
+  const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=(THEMES.find(t=>t[0]===(prefs.theme||"morska"))||THEMES[0])[2]}
+applyTheme();
 
 // ---------- Arkusz: wiersz = jedno ćwiczenie ----------
 const HEAD=["Data","Trening","Wersja","Partia","Ćwiczenie","Ciężar (kg)","Seria 1","Seria 2","Seria 3","Seria 4","Seria 5","Powt./sek. razem","Ocena","Czas (min)","Notatka ćw.","Notatka treningu","ID","Ciężary serii (kg)"];
@@ -391,6 +410,8 @@ function renderHist(){
   return h+`</section>`;
 }
 function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
+  <span class="lbl">Kolor</span><div class="chips" style="flex-wrap:wrap">${THEMES.map(([k,l,c])=>`<button class="chip" data-theme="${k}" aria-pressed="${(prefs.theme||"morska")===k}"><span class="swatch" style="background:${c}"></span>${l}</button>`).join("")}</div>
+  <span class="lbl">Tryb</span><div class="chips" style="flex-wrap:wrap"><button class="chip" data-mode="auto" aria-pressed="${prefs.mode!=="light"}">Jak w telefonie (jasny/ciemny)</button><button class="chip" data-mode="light" aria-pressed="${prefs.mode==="light"}">Zawsze jasny</button></div>
   <span class="lbl">Dźwięk końca przerwy</span><div class="chips"><button class="chip" id="snd" aria-pressed="${prefs.snd}">${prefs.snd?"Włączony":"Wyłączony"}</button></div>
   <span class="lbl">Gdy telefon jest wyciszony</span><div class="chips"><button class="chip" id="loud" aria-pressed="${!!prefs.loud}">${prefs.loud?"Graj mimo wyciszenia":"Nie graj"}</button></div>
   <p class="hint">„Graj mimo wyciszenia” działa na iPhonie także przy przełączniku wyciszenia, ale zatrzymuje muzykę z innych aplikacji (np. Spotify). Dźwięk gra tylko przy włączonym ekranie: aplikacja próbuje nie wygaszać ekranu w trakcie przerwy.</p></section>
@@ -428,6 +449,8 @@ document.addEventListener("click",async ev=>{
   if(b.id==="sync"){if(!ready()){showSettings=true;render();return}load();return}
   if(b.id==="cfg-save"){const u=$("#cfg-url").value.trim(),k=$("#cfg-key").value.trim();if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){toast("Adres musi kończyć się na /exec");return}
     b.disabled=true;try{const r=await fetch(u+"?action=data&key="+encodeURIComponent(k));const j=await r.json();if(!j.ok)throw new Error(j.error);cfg={url:u,key:k};ls.set("cfg",cfg);showSettings=false;toast("Połączono");load()}catch(e){toast("Nie udało się połączyć: "+(e&&e.message||""));b.disabled=false}return}
+  if(b.dataset.theme){prefs.theme=b.dataset.theme;ls.set("prefs",prefs);applyTheme();render();return}
+  if(b.dataset.mode){prefs.mode=b.dataset.mode;ls.set("prefs",prefs);applyTheme();render();return}
   if(b.id==="loud"){prefs.loud=!prefs.loud;ls.set("prefs",prefs);audio();beep(880,200);render();return}
   if(b.id==="snd"){prefs.snd=!prefs.snd;ls.set("prefs",prefs);audio();beep(880,200);render();return}
   if(b.dataset.arm){armed=b.dataset.arm;render();return}
