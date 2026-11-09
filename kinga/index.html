@@ -303,7 +303,7 @@ function nextUp(){for(const sl of activeSlots()){const it=draft.items[sl.id];if(
 
 // ---------- Przerwa ----------
 let restAt=null,restDur=0,restTick=null,actx=null,overBeeped=-1,wake=null;
-function audio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}}
+function audio(){try{if("audioSession" in navigator)navigator.audioSession.type=prefs.loud?"playback":"auto"}catch(e){}try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}}
 function beep(f,ms){try{if(!actx||!prefs.snd)return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.35,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
 async function keepAwake(){try{if("wakeLock" in navigator&&!wake){wake=await navigator.wakeLock.request("screen");wake.addEventListener("release",()=>{wake=null})}}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&restAt)keepAwake()});
@@ -392,7 +392,8 @@ function renderHist(){
 }
 function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
   <span class="lbl">Dźwięk końca przerwy</span><div class="chips"><button class="chip" id="snd" aria-pressed="${prefs.snd}">${prefs.snd?"Włączony":"Wyłączony"}</button></div>
-  <p class="hint">Na iPhonie dźwięk działa, gdy aplikacja jest otwarta. Wycisz dzwonek? Dźwięk i tak może nie zagrać przy przełączniku wyciszenia.</p></section>
+  <span class="lbl">Gdy telefon jest wyciszony</span><div class="chips"><button class="chip" id="loud" aria-pressed="${!!prefs.loud}">${prefs.loud?"Graj mimo wyciszenia":"Nie graj"}</button></div>
+  <p class="hint">„Graj mimo wyciszenia” działa na iPhonie także przy przełączniku wyciszenia, ale zatrzymuje muzykę z innych aplikacji (np. Spotify). Dźwięk gra tylko przy włączonym ekranie: aplikacja próbuje nie wygaszać ekranu w trakcie przerwy.</p></section>
   ${renderConn()}<button class="primary" id="close-settings">Gotowe</button>`}
 function renderConn(){return `<section class="card"><h2>Arkusz Google</h2>
   <p class="hint">${ready()?"Treningi zapisują się w arkuszu „Trening Kinga” na Dysku Igora.":"Brak adresu skryptu. Poproś Igora o ustawienie połączenia."}</p>
@@ -427,6 +428,7 @@ document.addEventListener("click",async ev=>{
   if(b.id==="sync"){if(!ready()){showSettings=true;render();return}load();return}
   if(b.id==="cfg-save"){const u=$("#cfg-url").value.trim(),k=$("#cfg-key").value.trim();if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){toast("Adres musi kończyć się na /exec");return}
     b.disabled=true;try{const r=await fetch(u+"?action=data&key="+encodeURIComponent(k));const j=await r.json();if(!j.ok)throw new Error(j.error);cfg={url:u,key:k};ls.set("cfg",cfg);showSettings=false;toast("Połączono");load()}catch(e){toast("Nie udało się połączyć: "+(e&&e.message||""));b.disabled=false}return}
+  if(b.id==="loud"){prefs.loud=!prefs.loud;ls.set("prefs",prefs);audio();beep(880,200);render();return}
   if(b.id==="snd"){prefs.snd=!prefs.snd;ls.set("prefs",prefs);audio();beep(880,200);render();return}
   if(b.dataset.arm){armed=b.dataset.arm;render();return}
   if(b.dataset.cancel){armed=null;render();return}
