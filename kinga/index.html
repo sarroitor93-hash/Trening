@@ -190,7 +190,7 @@ const findEx=(sl,name)=>sl.ex.find(e=>e.n===name)||Object.assign({},sl.ex[0],{n:
 
 // ---------- Ustawienia i połączenie ----------
 // Adres skryptu Google (Apps Script) i klucz. Wpisane na stałe, żeby na telefonie nic nie trzeba było ustawiać.
-const SCRIPT_URL="";
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbz8pgya73F2SDVHZSkbDn1WtSOZhL0LWln9W9B9LWvuQ-DIhJg46tU_-gSWxUMgUn4/exec";
 const SCRIPT_KEY="uCLJkHkzxkxJQQIm";
 let cfg=(c=>c&&c.url&&c.key?c:{url:SCRIPT_URL,key:SCRIPT_KEY})(ls.get("cfg",null));
 const ready=()=>!!(cfg.url&&cfg.key);
