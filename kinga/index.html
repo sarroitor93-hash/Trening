@@ -116,6 +116,10 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 .rest.over .t{color:var(--done)}
 .rest-b{display:flex;gap:6px}
 .rest-b button{width:auto;padding:9px 11px}
+.restctl{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted);flex-wrap:wrap}
+.restctl b{font-family:var(--display);font-size:20px;color:var(--fg);min-width:44px;text-align:center}
+.restctl .mini{padding:4px 12px;font-size:16px}
+.restctl .mini[data-rest],.restctl .mini[data-rdef]{font-size:13px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:14px;z-index:7;max-width:calc(100% - 32px);text-align:center}
 .warnbox{border-color:var(--warn)}
 @media (prefers-reduced-motion:no-preference){.set,.chip,.feel button,.tabs button{transition:background .12s,color .12s,border-color .12s}}
@@ -339,6 +343,8 @@ function nItem(sl,it){return setsFor(sl)+(it.plus||0)}
 function nextUp(){for(const sl of activeSlots()){const it=draft.items[sl.id];if(it.skip)continue;const n=nItem(sl,it),d=it.sets.slice(0,n).filter(x=>x!=null).length;if(d<n)return it.ex+" · seria "+(d+1)+"/"+n}return null}
 
 // ---------- Przerwa ----------
+let restCfg=ls.get("rest",{});
+const restFor=(sl,name)=>restCfg[name]!=null?restCfg[name]:(sl?sl.rest:90);
 let restAt=null,restDur=0,restTick=null,actx=null,overBeeped=-1,wake=null;
 function audio(){try{if("audioSession" in navigator)navigator.audioSession.type=prefs.loud?"playback":"auto"}catch(e){}try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}}
 function beep(f,ms){try{if(!actx||!prefs.snd)return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.35,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
@@ -381,7 +387,8 @@ function slotBlock(sl,key,it,extra){
     <div class="sets">${it.sets.slice(0,n).map((v,i)=>`<button class="set num ${v!=null?"on":""}" data-set="${key}" data-i="${i}" aria-label="Seria ${i+1}">${v!=null?`${fmt(v)}${ex.unit==="kg"&&it.ws[i]!=null?`<small>${fmt(it.ws[i])} kg</small>`:""}`:"·"}</button>`).join("")}</div>
     ${done?`<div><span class="lbl">Jak było?</span><div class="feel" style="margin-top:6px">${Object.keys(FEEL).map(k=>`<button data-feel="${key}" data-v="${k}" aria-pressed="${it.feel===k}">${FEEL[k]}</button>`).join("")}</div></div>`:""}
     ${it.noteOpen||it.note?`<input class="name" data-note-for="${key}" placeholder="Notatka, np. ustawienie maszyny, odczucia" value="${esc(it.note||"")}">`:""}
-    <div class="tools"><button class="mini" data-addset="${key}">+ seria</button><button class="mini" data-noteopen="${key}">✎ notatka</button>${extra?`<button class="mini" data-rmx="${key}">Usuń</button>`:`<button class="mini" data-skip="${key}">Pomiń</button>`}${!extra?`<button class="mini" data-rest="${sl.id}">▶ przerwa ${mmss(sl.rest)}</button>`:""}</div>
+    <div class="tools"><button class="mini" data-addset="${key}">+ seria</button><button class="mini" data-noteopen="${key}">✎ notatka</button>${extra?`<button class="mini" data-rmx="${key}">Usuń</button>`:`<button class="mini" data-skip="${key}">Pomiń</button>`}</div>
+    ${!extra?`<div class="restctl">Przerwa <button class="mini" data-rdec="${key}" aria-label="Krócej">−</button><b class="num">${mmss(restFor(sl,it.ex))}</b><button class="mini" data-rinc="${key}" aria-label="Dłużej">+</button><button class="mini" data-rest="${key}">▶ Start</button>${restCfg[it.ex]!=null&&restCfg[it.ex]!==sl.rest?`<button class="mini" data-rdef="${key}">domyślna ${mmss(sl.rest)}</button>`:""}</div>`:""}
   </section>`;
 }
 function renderTrening(){
@@ -486,11 +493,13 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.addset){itemOf(b.dataset.addset).plus++;saveDraft();render();return}
   if(b.dataset.noteopen){const it=itemOf(b.dataset.noteopen);it.noteOpen=true;saveDraft();render();const el=document.querySelector(`[data-note-for="${b.dataset.noteopen}"]`);if(el)el.focus();return}
   if(b.dataset.rmx){draft.extras.splice(+b.dataset.rmx.slice(1),1);saveDraft();render();return}
-  if(b.dataset.rest){startRest(slotOf(b.dataset.rest).rest);return}
+  if(b.dataset.rest){const k=b.dataset.rest;startRest(restFor(slotOf(k),itemOf(k).ex));return}
+  if(b.dataset.rinc||b.dataset.rdec){const k=b.dataset.rinc||b.dataset.rdec,sl=slotOf(k),n=itemOf(k).ex;restCfg[n]=Math.max(15,Math.min(600,restFor(sl,n)+(b.dataset.rinc?15:-15)));ls.set("rest",restCfg);render();return}
+  if(b.dataset.rdef){const n=itemOf(b.dataset.rdef).ex;delete restCfg[n];ls.set("rest",restCfg);render();return}
   if(b.dataset.feel){const it=itemOf(b.dataset.feel);it.feel=it.feel===b.dataset.v?null:b.dataset.v;saveDraft();render();return}
   if(b.dataset.set){const key=b.dataset.set,it=itemOf(key),i=+b.dataset.i;
     if(it.sets[i]!=null){it.sets[i]=null;it.ws[i]=null}
-    else{it.sets[i]=it.r;it.ws[i]=it.w;if(!draft.start)draft.start=Date.now();const sl=slotOf(key);startRest(sl?sl.rest:90)}
+    else{it.sets[i]=it.r;it.ws[i]=it.w;if(!draft.start)draft.start=Date.now();const sl=slotOf(key);startRest(restFor(sl,it.ex))}
     saveDraft();render();return}
   if(b.id==="add-ex"){draft.extras.push({ex:"",w:0,r:10,sets:[],ws:[],feel:null,note:"",plus:0});saveDraft();render();const els=document.querySelectorAll("[data-name-for^='x']");if(els.length)els[els.length-1].focus();return}
   if(b.id==="add-cardio"){draft.cardio={ex:CARDIO[0],min:10};saveDraft();render();return}
