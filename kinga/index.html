@@ -166,13 +166,13 @@ const SLOTS=[
     E("Uginanie nogi stojąc (jednonóż)",10,15,{inc:2.5,wl:"kg · na nogę"}),
     E("RDL z hantlami",10,12,{inc:2,step:1,wl:"kg · 1 hantla"}),
     E("Uginanie nóg na piłce fitness",10,15,{unit:"bw"})]},
-  {id:"kla",title:"Klatka",sets:2,rest:90,min:false,ex:[
+  {id:"kla",title:"Klatka",sets:3,rest:90,min:false,ex:[
     E("Wyciskanie siedząc na maszynie",10,12),
     E("Wyciskanie na skosie na maszynie",10,12),
     E("Rozpiętki na maszynie",12,15),
     E("Wyciskanie hantli na ławce",10,12,{inc:2,step:1,wl:"kg · 1 hantla"}),
     E("Wyciskanie na maszynie z talerzami",10,12)]},
-  {id:"ple",title:"Plecy",sets:2,rest:90,min:false,ex:[
+  {id:"ple",title:"Plecy",sets:3,rest:90,min:false,ex:[
     E("Ściąganie drążka do klatki",10,12),
     E("Wiosłowanie na maszynie z oparciem",10,12),
     E("Przyciąganie linki siedząc (wyciąg dolny)",10,12),
@@ -189,11 +189,12 @@ const CARDIO=["Rower","Bieżnia pod górę","Orbitrek"];
 const findEx=(sl,name)=>sl.ex.find(e=>e.n===name)||Object.assign({},sl.ex[0],{n:name,custom:true});
 
 // ---------- Ustawienia i połączenie ----------
-let cfg=ls.get("cfg",{});
-const GMODE=()=>cfg.mode==="google";
-const ready=()=>GMODE()?!!cfg.email:!!(cfg.url&&cfg.key);
+// Adres skryptu Google (Apps Script) i klucz. Wpisane na stałe, żeby na telefonie nic nie trzeba było ustawiać.
+const SCRIPT_URL="";
+const SCRIPT_KEY="uCLJkHkzxkxJQQIm";
+let cfg=(c=>c&&c.url&&c.key?c:{url:SCRIPT_URL,key:SCRIPT_KEY})(ls.get("cfg",null));
+const ready=()=>!!(cfg.url&&cfg.key);
 let prefs=Object.assign({snd:true},ls.get("prefs",{}));
-(function(){const m=location.hash.match(/k=([A-Za-z0-9_-]+)/),u=location.hash.match(/u=([^&]+)/);if(m&&u){cfg={mode:"script",url:decodeURIComponent(u[1]),key:m[1]};ls.set("cfg",cfg);history.replaceState(null,"",location.pathname)}})();
 
 // ---------- Arkusz: wiersz = jedno ćwiczenie ----------
 const HEAD=["Data","Trening","Wersja","Partia","Ćwiczenie","Ciężar (kg)","Seria 1","Seria 2","Seria 3","Seria 4","Seria 5","Powt./sek. razem","Ocena","Czas (min)","Notatka ćw.","Notatka treningu","ID","Ciężary serii (kg)"];
@@ -225,46 +226,12 @@ function fromRows(rows){
   return out;
 }
 
-// Google (logowanie w telefonie, dostęp tylko do pliku utworzonego przez aplikację)
-const G_CLIENT="288637060767-m1c6nb6dv2mc0qo52o8fe3rcnfcg7ejr.apps.googleusercontent.com";
-const G_SCOPE="https://www.googleapis.com/auth/drive.file openid email";
-const SH="https://sheets.googleapis.com/v4/spreadsheets/";
-let gTok=ls.get("gtok",null);
-const gTokOk=()=>gTok&&gTok.exp>Date.now()+60000;
-function gLoad(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const sc=document.createElement("script");sc.src="https://accounts.google.com/gsi/client";sc.onload=()=>res();sc.onerror=()=>rej(new Error("brak połączenia z Google"));document.head.appendChild(sc)})}
-function gLogin(prompt){return gLoad().then(()=>new Promise((res,rej)=>{
-  const c=google.accounts.oauth2.initTokenClient({client_id:G_CLIENT,scope:G_SCOPE,login_hint:cfg.email||undefined,
-    callback:r=>{if(r.error)return rej(new Error(r.error));gTok={t:r.access_token,exp:Date.now()+(r.expires_in||3600)*1000};ls.set("gtok",gTok);res(gTok)},
-    error_callback:e=>rej(new Error(e&&e.type||"popup"))});
-  c.requestAccessToken({prompt:prompt==null?"":prompt})}))}
-async function gFetch(url,opt){
-  if(!gTokOk())throw {auth:true};
-  opt=Object.assign({},opt||{});opt.headers=Object.assign({"Authorization":"Bearer "+gTok.t},opt.body?{"Content-Type":"application/json"}:{});
-  const r=await fetch(url,opt);if(r.status===401){gTok=null;ls.del("gtok");throw {auth:true}}
-  const j=r.status===204?{}:await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||("HTTP "+r.status));return j}
-async function gSheet(){
-  if(cfg.sheetId)return cfg.sheetId;
-  const q=encodeURIComponent("appProperties has { key='treningKinga' and value='1' } and trashed=false");
-  const f=await gFetch("https://www.googleapis.com/drive/v3/files?q="+q+"&fields=files(id,name)&spaces=drive");
-  if(f.files&&f.files.length){cfg.sheetId=f.files[0].id;ls.set("cfg",cfg);return cfg.sheetId}
-  const c=await gFetch("https://sheets.googleapis.com/v4/spreadsheets",{method:"POST",body:JSON.stringify({properties:{title:"Trening Kinga",locale:"pl_PL",timeZone:"Europe/Warsaw"},sheets:[{properties:{title:TAB,gridProperties:{frozenRowCount:1}}}]})});
-  const id=c.spreadsheetId;
-  await gFetch(SH+id+"/values/"+encodeURIComponent(TAB+"!A1")+"?valueInputOption=RAW",{method:"PUT",body:JSON.stringify({values:[HEAD]})});
-  await gFetch("https://www.googleapis.com/drive/v3/files/"+id,{method:"PATCH",body:JSON.stringify({appProperties:{treningKinga:"1"}})});
-  cfg.sheetId=id;ls.set("cfg",cfg);return id}
-async function gIds(id){const j=await gFetch(SH+id+"/values/"+encodeURIComponent(TAB+"!"+IDCOL+"2:"+IDCOL));return (j.values||[]).map(r=>String(r[0]))}
 const api={
   async data(){
-    if(GMODE()){const id=await gSheet();const j=await gFetch(SH+id+"/values/"+encodeURIComponent(TAB+"!A2:"+LASTCOL)+"?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING");return j.values||[]}
     const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key));const j=await r.json();if(!j.ok)throw new Error(j.error);return j.rows||[]},
   async save(e){
-    if(GMODE()){const id=await gSheet();if((await gIds(id)).includes(e.id))return;
-      await gFetch(SH+id+"/values/"+encodeURIComponent(TAB+"!A1")+":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",{method:"POST",body:JSON.stringify({values:rowsOf(e)})});return}
     const r=await fetch(cfg.url,{method:"POST",body:JSON.stringify({key:cfg.key,action:"save",id:e.id,rows:rowsOf(e)})});const j=await r.json();if(!j.ok)throw new Error(j.error||"zapis")},
   async del(eid){
-    if(GMODE()){const id=await gSheet();const meta=await gFetch(SH+id+"?fields=sheets.properties(sheetId,title)");const sh=meta.sheets.find(s=>s.properties.title===TAB);
-      const ids=await gIds(id),reqs=[];for(let i=ids.length-1;i>=0;i--)if(ids[i]===eid)reqs.push({deleteDimension:{range:{sheetId:sh.properties.sheetId,dimension:"ROWS",startIndex:i+1,endIndex:i+2}}});
-      if(reqs.length)await gFetch(SH+id+":batchUpdate",{method:"POST",body:JSON.stringify({requests:reqs})});return}
     const r=await fetch(cfg.url,{method:"POST",body:JSON.stringify({key:cfg.key,action:"delete",id:eid})});const j=await r.json();if(!j.ok)throw new Error(j.error||"usuwanie")}
 };
 
@@ -272,29 +239,26 @@ const api={
 let entries=[];
 const queue=()=>ls.get("queue",[]);
 function setEntries(list){const q=queue(),ids=new Set(list.map(e=>e.id)),pd=new Set(ls.get("pendingDel",[]));
-  entries=list.concat(q.filter(e=>!ids.has(e.id))).filter(e=>!pd.has(e.id)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  if(draft&&draft.auto&&!draftHasSets()){draft=newDraft(draft.auto==="next"?nextType():draft.type,draft.minimum);draft.auto=true;ls.set("draft",draft)}render()}
-let needLogin=false,lastErr="",flushing=null;
+  entries=list.concat(q.filter(e=>!ids.has(e.id))).filter(e=>!pd.has(e.id)).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(draft&&draft.auto&&!draftHasSets()){const a=draft.auto;draft=newDraft(a==="next"?nextType():draft.type,draft.minimum);draft.auto=a;ls.set("draft",draft)}render()}
+let lastErr="",flushing=null;
 function flush(){if(!flushing)flushing=doFlush().finally(()=>{flushing=null});return flushing}
 async function doFlush(){
   if(!ready()||!navigator.onLine)return syncLabel();
-  if(GMODE()&&!gTokOk()){if(queue().length||ls.get("pendingDel",[]).length)needLogin=true;return syncLabel()}
-  for(const e of queue()){try{await api.save(e);ls.set("queue",queue().filter(x=>x.id!==e.id));lastErr=""}catch(err){if(err&&err.auth){needLogin=true;break}lastErr=String(err&&err.message||err);break}}
-  for(const id of ls.get("pendingDel",[])){try{await api.del(id);ls.set("pendingDel",ls.get("pendingDel",[]).filter(x=>x!==id));ls.set("cache",ls.get("cache",[]).filter(x=>x.id!==id))}catch(err){if(err&&err.auth)needLogin=true;break}}
+  for(const e of queue()){try{await api.save(e);const c=ls.get("cache",[]);if(!c.some(x=>x.id===e.id))ls.set("cache",c.concat([e]));ls.set("queue",queue().filter(x=>x.id!==e.id));lastErr=""}catch(err){lastErr=String(err&&err.message||err);break}}
+  for(const id of ls.get("pendingDel",[])){try{await api.del(id);ls.set("pendingDel",ls.get("pendingDel",[]).filter(x=>x!==id));ls.set("cache",ls.get("cache",[]).filter(x=>x.id!==id))}catch(err){break}}
   syncLabel()}
 function setSync(t,err){const el=$("#sync");el.textContent=t;el.classList.toggle("err",!!err)}
 function syncLabel(){const q=queue().length+ls.get("pendingDel",[]).length;
   if(!ready())return setSync("Nie połączono",true);
-  if(GMODE()&&(needLogin||!gTokOk()))return setSync((q?q+" czeka · ":"")+"Dotknij, by wysłać",!!q);
   if(!navigator.onLine)return setSync(q?"Offline · "+q+" czeka":"Offline",!!q);
   setSync(q?q+" czeka"+(lastErr?" · "+lastErr.slice(0,40):""):"Zapisane w arkuszu",!!q)}
 async function load(){
   setEntries(ls.get("cache",[]));
   if(!ready()){syncLabel();return}
   await flush();
-  if(GMODE()&&!gTokOk()){syncLabel();return}
   try{const list=fromRows(await api.data());ls.set("cache",list);setEntries(list);syncLabel()}
-  catch(e){if(e&&e.auth){needLogin=true;syncLabel();return}setSync(navigator.onLine?"Brak połączenia z arkuszem":"Offline · dane z telefonu",true)}
+  catch(e){setSync(navigator.onLine?"Brak połączenia z arkuszem":"Offline · dane z telefonu",true)}
 }
 
 // ---------- Historia i podpowiedź ciężaru ----------
@@ -321,13 +285,12 @@ function suggest(ex,last){
   return {w,r,txt:word+" ("+why+")",dir:k>0?1:k<0?-1:0};
 }
 function firstDate(){const w=workouts();return w.length?new Date(w[w.length-1].date).getTime():null}
-function early(){const f=firstDate();return f==null||Date.now()-f<14*864e5}
 function nextType(){const w=workouts()[0];if(!w)return "A";const i=SESS.indexOf(w.type);return i<0?"A":SESS[(i+1)%SESS.length]}
 
 // ---------- Bieżący trening ----------
 let draft=ls.get("draft",null);
 function saveDraft(){if(draft)delete draft.auto;ls.set("draft",draft)}
-function setsFor(sl){return (early()?Math.min(2,sl.sets):sl.sets)}
+function setsFor(sl){return sl.sets}
 function freshItem(sl,ex){const last=lastFor(ex.n),s=suggest(ex,last);
   return {ex:ex.n,w:ex.unit==="kg"?(s.w==null?0:s.w):null,r:s.r,sets:[],ws:[],feel:null,note:"",plus:0,skip:!!sl.opt}}
 function newDraft(type,minimum){const d={id:"k"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),type,minimum:!!minimum,note:"",items:{},extras:[],cardio:null,start:null};
@@ -363,7 +326,7 @@ let tab="trening",armed=null,saving=false,showSettings=false;
 document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{tab=b.dataset.tab;showSettings=false;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));render();window.scrollTo(0,0)}));
 function stepper(id,val,unit){return `<div><div class="stepper"><button data-dec="${id}" aria-label="mniej">−</button><input id="${id}" class="num" inputmode="decimal" value="${val==null?"":fmt(val)}" placeholder="—"><button data-inc="${id}" aria-label="więcej">+</button></div><span class="unit">${unit}</span></div>`}
 function slotBlock(sl,key,it,extra){
-  const ex=extra?E(it.ex||"",10,12):findEx(sl,it.ex),n=extra?2+(it.plus||0):nItem(sl,it);
+  const ex=extra?E(it.ex||"",10,12):findEx(sl,it.ex),n=extra?3+(it.plus||0):nItem(sl,it);
   if(it.skip)return `<section class="slot skipped"><div class="slot-h"><h2>${esc(extra?"Dodatkowe":sl.title)}${sl&&sl.opt?" · opcja":""}</h2><button class="mini" data-unskip="${key}">${sl&&sl.opt?"Robię":"Przywróć"}</button></div>${sl&&sl.opt?`<p class="hint">Na koniec, jeśli jest czas: ${esc(sl.ex.map(e=>e.n).join(", "))}.</p>`:`<p class="hint">Pominięte w tym treningu</p>`}</section>`;
   while(it.sets.length<n)it.sets.push(null);
   const done=it.sets.slice(0,n).filter(x=>x!=null).length,allDone=done>=n;
@@ -389,7 +352,7 @@ function renderTrening(){
   const nt=nextType();
   let h=`<div class="bar"><div class="seg" role="group" aria-label="Trening">${SESS.map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
     <button class="tog" id="minimum" aria-pressed="${draft.minimum}">${draft.minimum?"Minimum · ok. 30 min":"Wersja minimum"}</button></div>
-    <p class="hint">${draft.minimum?"Minimum: same nogi. Lepsze niż nic.":"Kolejny w kolejce: <b>"+nt+"</b>."} ${early()?"Pierwsze 2 tygodnie: po 2 serie, odczucie „średnio”, bez walki do upadku.":"Zostaw 1–2 powtórzenia w zapasie."}</p>`;
+    <p class="hint">${draft.minimum?"Minimum: same nogi. Lepsze niż nic.":"Kolejny w kolejce: <b>"+nt+"</b>."} Bez walki do upadku: zostaw 1–2 powtórzenia w zapasie.</p>`;
   if(draft.start&&draftHasSets())h+=`<p class="hint num">Trening trwa: <b>${mmss((Date.now()-draft.start)/1000)}</b></p>`;
   for(const sl of activeSlots())h+=slotBlock(sl,sl.id,draft.items[sl.id],false);
   draft.extras.forEach((x,i)=>{h+=slotBlock(null,"x"+i,x,true)});
@@ -415,7 +378,7 @@ function missing(){const out=[];for(const sl of activeSlots()){const it=draft.it
   if(d>0&&d<n)out.push(it.ex+": "+d+" z "+n+" serii");if(d>0&&!it.feel)out.push(it.ex+": brak oceny");if(d===0&&!sl.opt)out.push(it.ex+": nie zrobione")}return out}
 function renderHist(){
   const w=workouts(),now=Date.now(),c28=w.filter(e=>now-new Date(e.date).getTime()<28*864e5).length;
-  let h=`<section class="card"><h2>Regularność</h2><p class="hint"><b style="font-size:20px;color:var(--fg)">${c28}</b> treningów w ostatnich 28 dniach · cel 8–12</p></section>`;
+  let h=`<section class="card"><h2>Regularność</h2><p class="hint"><b style="font-size:20px;color:var(--fg)">${c28}</b> ${c28===1?"trening":c28%10>=2&&c28%10<=4&&(c28%100<12||c28%100>14)?"treningi":"treningów"} w ostatnich 28 dniach · cel 8–12</p></section>`;
   const first={},lastv={};
   for(const e of w.slice().reverse())for(const it of e.items){if(it.min!=null||!(it.sets||[]).some(x=>x!=null))continue;const v=topW(it)>0?fmt(topW(it))+" kg":Math.max(...it.sets.filter(x=>x!=null))+"";if(!(it.ex in first))first[it.ex]=v;lastv[it.ex]=v}
   const names=Object.keys(first);
@@ -432,14 +395,12 @@ function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
   <p class="hint">Na iPhonie dźwięk działa, gdy aplikacja jest otwarta. Wycisz dzwonek? Dźwięk i tak może nie zagrać przy przełączniku wyciszenia.</p></section>
   ${renderConn()}<button class="primary" id="close-settings">Gotowe</button>`}
 function renderConn(){return `<section class="card"><h2>Arkusz Google</h2>
-  ${ready()?`<p class="hint">${GMODE()?"Połączono z kontem "+esc(cfg.email)+". Arkusz: „Trening Kinga”.":"Połączono przez skrypt."}</p>`:`<p class="hint">Treningi zapisują się w arkuszu „Trening Kinga” na Dysku Google. Zaloguj się kontem, na którym ma być arkusz.</p>`}
-  <button class="primary" id="g-login">${GMODE()&&ready()?"Zaloguj ponownie":"Zaloguj przez Google"}</button>
-  ${ready()?`<button class="ghost" id="logout">Rozłącz (dane w arkuszu zostają)</button>`:""}
-  <details><summary style="font-size:15px">Połączenie przez skrypt</summary><div style="display:grid;gap:8px;margin-top:8px">
+  <p class="hint">${ready()?"Treningi zapisują się w arkuszu „Trening Kinga” na Dysku Igora.":"Brak adresu skryptu. Poproś Igora o ustawienie połączenia."}</p>
+  <details><summary style="font-size:15px">Zmień połączenie</summary><div style="display:grid;gap:8px;margin-top:8px">
   <input class="name" id="cfg-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url||"")}">
   <input class="name" id="cfg-key" placeholder="Klucz" value="${esc(cfg.key||"")}"><button class="ghost" id="cfg-save">Połącz</button></div></details></section>`}
 function render(){const y=window.scrollY;
-  $("#main").innerHTML=showSettings?renderSettings():!ready()&&tab==="trening"&&!ls.get("skipSetup",false)?renderConn()+`<button class="ghost" id="skip-setup">Na razie bez arkusza (zapis w telefonie)</button>`:tab==="hist"?renderHist():renderTrening();
+  $("#main").innerHTML=showSettings?renderSettings():tab==="hist"?renderHist():renderTrening();
   window.scrollTo(0,y)}
 
 // ---------- Zdarzenia ----------
@@ -463,15 +424,9 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.dec)return bump(b.dataset.dec,-1);
   if(b.id==="open-settings"){showSettings=!showSettings;render();window.scrollTo(0,0);return}
   if(b.id==="close-settings"){showSettings=false;render();return}
-  if(b.id==="skip-setup"){ls.set("skipSetup",true);render();return}
-  if(b.id==="sync"){if(!ready()){showSettings=true;render();return}if(GMODE()&&(needLogin||!gTokOk())){try{await gLogin("");needLogin=false;await load()}catch(e){toast("Nie udało się połączyć z Google")}}else load();return}
-  if(b.id==="g-login"){b.disabled=true;b.textContent="Łączę…";
-    try{await gLogin("select_account");const j=await gFetch("https://www.googleapis.com/oauth2/v3/userinfo");const prev=cfg;cfg={mode:"google",email:j.email};if(prev.mode==="google"&&prev.email===j.email&&prev.sheetId)cfg.sheetId=prev.sheetId;ls.set("cfg",cfg);
-      await gSheet();needLogin=false;showSettings=false;toast("Połączono z arkuszem „Trening Kinga”");await load();render()}
-    catch(e){toast("Nie udało się zalogować"+(e&&e.message?": "+e.message:""));b.disabled=false;b.textContent="Zaloguj przez Google"}return}
-  if(b.id==="logout"){ls.del("gtok");gTok=null;cfg={};ls.set("cfg",cfg);render();syncLabel();return}
+  if(b.id==="sync"){if(!ready()){showSettings=true;render();return}load();return}
   if(b.id==="cfg-save"){const u=$("#cfg-url").value.trim(),k=$("#cfg-key").value.trim();if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){toast("Adres musi kończyć się na /exec");return}
-    b.disabled=true;try{const r=await fetch(u+"?action=data&key="+encodeURIComponent(k));const j=await r.json();if(!j.ok)throw new Error(j.error);cfg={mode:"script",url:u,key:k};ls.set("cfg",cfg);showSettings=false;toast("Połączono");load()}catch(e){toast("Nie udało się połączyć: "+(e&&e.message||""));b.disabled=false}return}
+    b.disabled=true;try{const r=await fetch(u+"?action=data&key="+encodeURIComponent(k));const j=await r.json();if(!j.ok)throw new Error(j.error);cfg={url:u,key:k};ls.set("cfg",cfg);showSettings=false;toast("Połączono");load()}catch(e){toast("Nie udało się połączyć: "+(e&&e.message||""));b.disabled=false}return}
   if(b.id==="snd"){prefs.snd=!prefs.snd;ls.set("prefs",prefs);audio();beep(880,200);render();return}
   if(b.dataset.arm){armed=b.dataset.arm;render();return}
   if(b.dataset.cancel){armed=null;render();return}
@@ -480,7 +435,7 @@ document.addEventListener("click",async ev=>{
     setEntries(ls.get("cache",[]));toast("Usunięto");flush();return}
   if(tab!=="trening"||!draft)return;
   if(b.dataset.type){if(b.dataset.type===draft.type)return;if(draftHasSets()){toast("Masz niezapisane serie. Zapisz albo wyczyść trening.");return}draft=newDraft(b.dataset.type,draft.minimum);draft.auto=true;ls.set("draft",draft);render();return}
-  if(b.id==="minimum"){draft.minimum=!draft.minimum;const a=draft.auto;ls.set("draft",draft);render();return}
+  if(b.id==="minimum"){draft.minimum=!draft.minimum;ls.set("draft",draft);render();return}
   if(b.dataset.pick){const key=b.dataset.pick,sl=slotOf(key),old=itemOf(key),fresh=freshItem(sl,sl.ex[+b.dataset.i]);fresh.skip=false;draft.items[key]=fresh;if(old.sets.some(x=>x!=null))toast("Nowe ćwiczenie, serie zaczynają się od zera");saveDraft();render();return}
   if(b.dataset.other){const it=itemOf(b.dataset.other);it.other=true;saveDraft();render();const el=document.querySelector(`[data-name-for="${b.dataset.other}"]`);if(el)el.focus();return}
   if(b.dataset.skip){itemOf(b.dataset.skip).skip=true;saveDraft();render();return}

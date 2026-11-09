@@ -1,25 +1,27 @@
-// Trening Kinga — zapasowy backend (Apps Script). Używany tylko, jeśli logowanie Google w aplikacji nie działa na iPhonie.
+// Trening Kinga — backend (Apps Script): zapis treningów do arkusza „Trening Kinga” na Dysku.
 // Wdrożenie: script.google.com → Nowy projekt → wklej ten plik → uruchom setup() raz (zgoda) →
 // Wdróż → Nowe wdrożenie → Aplikacja internetowa → Wykonuj jako: Ja, Dostęp: Każdy → skopiuj adres /exec.
-// Klucz pokaże się w logu po setup(). Adres + klucz wpisz w aplikacji: ⚙ → Połączenie przez skrypt.
+// Klucz jest ten sam co w aplikacji (index.html, SCRIPT_KEY). Adres /exec wpisuje Claude w aplikacji.
 const TAB = "Treningi";
 const HEAD = ["Data","Trening","Wersja","Partia","Ćwiczenie","Ciężar (kg)","Seria 1","Seria 2","Seria 3","Seria 4","Seria 5","Powt./sek. razem","Ocena","Czas (min)","Notatka ćw.","Notatka treningu","ID","Ciężary serii (kg)"];
 const ID_COL = 17;
+const KEY = "uCLJkHkzxkxJQQIm";
 
 function setup() {
   const p = PropertiesService.getScriptProperties();
   if (!p.getProperty("SHEET")) {
     const ss = SpreadsheetApp.create("Trening Kinga");
+    ss.setSpreadsheetTimeZone("Europe/Warsaw");
     const sh = ss.getSheets()[0]; sh.setName(TAB); sh.appendRow(HEAD); sh.setFrozenRows(1);
     p.setProperty("SHEET", ss.getId());
   }
-  if (!p.getProperty("KEY")) p.setProperty("KEY", Utilities.getUuid().replace(/-/g, "").slice(0, 16));
-  Logger.log("Klucz: " + p.getProperty("KEY") + "  Arkusz: https://docs.google.com/spreadsheets/d/" + p.getProperty("SHEET"));
+  SpreadsheetApp.openById(p.getProperty("SHEET")).setSpreadsheetTimeZone("Europe/Warsaw");
+  Logger.log("Gotowe. Arkusz: https://docs.google.com/spreadsheets/d/" + p.getProperty("SHEET"));
 }
 function sheet_() { return SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty("SHEET")).getSheetByName(TAB); }
 function ok_(o) { return ContentService.createTextOutput(JSON.stringify(Object.assign({ ok: true }, o || {}))).setMimeType(ContentService.MimeType.JSON); }
 function err_(m) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: m })).setMimeType(ContentService.MimeType.JSON); }
-function keyOk_(k) { return k && k === PropertiesService.getScriptProperties().getProperty("KEY"); }
+function keyOk_(k) { return k === KEY; }
 function ids_(sh) { const n = sh.getLastRow() - 1; return n > 0 ? sh.getRange(2, ID_COL, n, 1).getValues().map(r => String(r[0])) : []; }
 
 function doGet(e) {
