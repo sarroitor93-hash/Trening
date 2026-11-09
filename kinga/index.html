@@ -58,7 +58,7 @@ main{display:grid;gap:12px;padding-top:6px}
 .slot.done{border-color:var(--done)}
 .slot-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .slot-h h2{font-family:var(--display);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.04em;margin:0}
-.target{font-size:13px;color:var(--muted)}
+.target{font-size:13px;color:var(--muted);white-space:nowrap}
 .exname{font-weight:600;font-size:17px}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -2px;padding:2px}
 .chips::-webkit-scrollbar{display:none}
@@ -217,37 +217,34 @@ const SLOTS=[
 ];
 // Trening w domu: gumy (power band, mini band) i hantle. Ok. 30 min, krótsze przerwy, bez skoków.
 const DOM=[
-  {id:"dpos",title:"Pośladki",sets:3,rest:60,ex:[
+  {id:"d1",title:"1",rest:45,sets:3,ex:[
     E("Mostek biodrowy z hantlą",12,20,{inc:2,step:1,wl:"kg · hantla na biodrach"}),
     E("Hip thrust na kanapie z hantlą",12,20,{inc:2,step:1,wl:"kg · hantla na biodrach"}),
-    E("Mostek biodrowy jednonóż",10,15,{unit:"bw"}),
-    E("Mostek z mini bandem nad kolanami",15,20,{unit:"bw"})]},
-  {id:"dodw",title:"Odwodzenie",sets:3,rest:45,ex:[
+    E("Mostek biodrowy jednonóż",10,15,{unit:"bw"})]},
+  {id:"d2",title:"2",rest:45,sets:3,ex:[
+    E("Przysiad do krzesła z hantlą",12,15,{inc:2,step:1,wl:"kg · hantla przy klatce"}),
+    E("Przysiad z power bandem",12,15,{unit:"bw"}),
+    E("Przysiad przy ścianie",30,45,{unit:"sek"})]},
+  {id:"d3",title:"3",rest:45,sets:3,ex:[
+    E("RDL z hantlami",12,15,{inc:2,step:1,wl:"kg · 1 hantla"}),
+    E("Good morning z power bandem",12,15,{unit:"bw"}),
+    E("Mostek z piętami daleko",12,15,{unit:"bw"})]},
+  {id:"d4",title:"4",rest:30,sets:3,ex:[
     E("Odwodzenie leżąc bokiem z mini bandem (na stronę)",15,20,{unit:"bw"}),
     E("Muszelka z mini bandem (na stronę)",15,20,{unit:"bw"}),
-    E("Krok boczny z mini bandem (na stronę)",12,15,{unit:"bw"}),
-    E("Odwodzenie w staniu z mini bandem (na stronę)",12,15,{unit:"bw"})]},
-  {id:"dczw",title:"Przód uda",sets:3,rest:60,ex:[
-    E("Przysiad do krzesła z hantlą",12,15,{inc:2,step:1,wl:"kg · hantla przy klatce"}),
-    E("Wyprost kolana siedząc z gumą (na nogę)",15,20,{unit:"bw"}),
-    E("Przysiad z power bandem",12,15,{unit:"bw"}),
-    E("Wejście na niski stopień (na nogę)",10,12,{unit:"bw"})]},
-  {id:"ddwu",title:"Tył uda",sets:3,rest:60,ex:[
-    E("RDL z hantlami",12,15,{inc:2,step:1,wl:"kg · 1 hantla"}),
-    E("Uginanie nóg leżąc z gumą",12,20,{unit:"bw"}),
-    E("Mostek z piętami daleko",12,15,{unit:"bw"})]},
-  {id:"dple",title:"Plecy",sets:2,rest:45,ex:[
+    E("Krok boczny z mini bandem (na stronę)",12,15,{unit:"bw"})]},
+  {id:"d5",title:"5",rest:45,sets:3,ex:[
+    E("Pompki na podwyższeniu",8,15,{unit:"bw"}),
+    E("Pompki na kolanach",8,15,{unit:"bw"}),
+    E("Wyciskanie hantli leżąc na podłodze",12,15,{inc:2,step:1,wl:"kg · 1 hantla"})]},
+  {id:"d6",title:"6",rest:45,sets:3,ex:[
     E("Wiosłowanie hantlą w opadzie (na rękę)",12,15,{inc:2,step:1,wl:"kg · 1 hantla"}),
     E("Wiosłowanie z power bandem",12,20,{unit:"bw"}),
-    E("Rozciąganie gumy przed sobą (band pull-apart)",15,20,{unit:"bw"})]},
-  {id:"dkla",title:"Klatka",sets:2,rest:45,ex:[
-    E("Pompki na podwyższeniu",8,15,{unit:"bw"}),
-    E("Wyciskanie hantli leżąc na podłodze",12,15,{inc:2,step:1,wl:"kg · 1 hantla"}),
-    E("Pompki na kolanach",8,15,{unit:"bw"})]},
-  {id:"dbrz",title:"Brzuch",sets:2,rest:30,opt:true,ex:[
+    E("Odwodzenie hantli bokiem",12,15,{inc:1,step:0.5,wl:"kg · 1 hantla"})]},
+  {id:"d7",title:"7",rest:30,sets:3,ex:[
     E("Deska",20,40,{unit:"sek"}),
-    E("Deska bokiem (na stronę)",20,40,{unit:"sek"}),
     E("Dead bug (na stronę)",8,12,{unit:"bw"}),
+    E("Deska bokiem (na stronę)",20,40,{unit:"sek"}),
     E("Łódka (hollow hold)",15,30,{unit:"sek"})]}
 ];
 const SESS=["A","B","C"],TYPES=["A","B","C","Dom"];
@@ -349,7 +346,7 @@ const workouts=()=>entries.filter(e=>e.items&&e.items.length);
 function lastFor(name){for(const e of workouts()){const it=e.items.find(i=>i.ex===name&&(i.sets||[]).some(x=>x!=null));if(it)return Object.assign({date:e.date},it)}return null}
 const topW=it=>Math.max(it.w||0,...((it.ws||[]).filter(x=>x!=null)));
 function suggest(ex,last){
-  if(!last)return {w:ex.unit==="kg"?null:undefined,r:ex.unit==="kg"?ex.lo:ex.lo,txt:"Pierwszy raz: dobierz ciężar tak, żeby było „średnio”",dir:0};
+  if(!last)return {w:ex.unit==="kg"?null:undefined,r:ex.lo,txt:ex.unit==="kg"?"Pierwszy raz: dobierz ciężar tak, żeby było „średnio”":ex.unit==="sek"?"Pierwszy raz: tyle sekund, żeby było „średnio”":"Pierwszy raz: dobierz gumę i powtórzenia tak, żeby było „średnio”",dir:0};
   const done=(last.sets||[]).filter(x=>x!=null),minR=Math.min(...done),maxR=Math.max(...done),f=last.feel;
   if(ex.unit!=="kg"){const add=ex.unit==="sek"?(f==="lekko"?10:f==="srednio"?5:0):(f==="lekko"?2:f==="srednio"?1:0);
     if(ex.unit==="bw"&&add&&maxR>=ex.hi)return {r:ex.lo,txt:`↑ mocniejsza guma albo trudniejsza wersja (ost. ${maxR} powt., ${FEEL[f].toLowerCase()})`,dir:1};
@@ -422,9 +419,9 @@ function slotBlock(sl,key,it,extra){
   const chips=extra?"":`<div class="chips">${sl.ex.map((e,i)=>`<button class="chip" data-pick="${key}" data-i="${i}" aria-pressed="${e.n===it.ex}">${i+1}. ${esc(e.n)}</button>`).join("")}<button class="chip" data-other="${key}" aria-pressed="${custom||!!it.other}">Inne…</button></div>`;
   const nameIn=(extra||custom||it.other)?`<input class="name" data-name-for="${key}" placeholder="Wpisz nazwę ćwiczenia" value="${esc(custom||extra?it.ex:"")}">`:"";
   const unitW=ex.wl||"kg",repU=ex.unit==="sek"?"sekundy":"powt.";
-  return `<section class="slot ${allDone?"done":""}"><div class="slot-h"><h2>${esc(extra?"Dodatkowe":sl.title)}${sl&&sl.opt?" · opcja":""}</h2><span class="target num">${n} × ${ex.lo}–${ex.hi}${ex.unit==="sek"?" s":""}</span></div>
+  return `<section class="slot ${allDone?"done":""}"><div class="slot-h"><h2>${esc(extra?"Dodatkowe":sl.id[0]==="d"?sl.title+" · "+it.ex:sl.title)}${sl&&sl.opt?" · opcja":""}</h2><span class="target num">${n} × ${ex.lo}–${ex.hi}${ex.unit==="sek"?" s":""}</span></div>
     ${!extra?`<div class="restctl">Przerwa <button class="mini" data-rdec="${key}" aria-label="Krócej">−</button><b class="num">${mmss(restFor(sl,it.ex))}</b><button class="mini" data-rinc="${key}" aria-label="Dłużej">+</button><button class="mini" data-rest="${key}">▶ Start</button>${restCfg[it.ex]!=null&&restCfg[it.ex]!==sl.rest?`<button class="mini" data-rdef="${key}">domyślna ${mmss(sl.rest)}</button>`:""}</div>`:""}
-    ${extra?"":`<div class="exname">${esc(it.ex)}</div>`}
+    ${extra||sl.id[0]==="d"?"":`<div class="exname">${esc(it.ex)}</div>`}
     ${chips}${nameIn}
     ${!extra&&!custom?`<div class="meta num">${lastTxt?`<span>${lastTxt}</span>`:""}<span class="sug ${s.dir>0?"up":""}">${esc(s.txt)}</span></div>`:""}
     <div class="row ${ex.unit==="kg"?"":"one"}">${ex.unit==="kg"?stepper("w-"+key,it.w,unitW):""}<div class="reps">${stepper("r-"+key,it.r,repU)}</div></div>
@@ -440,7 +437,7 @@ function renderTrening(){
   const nt=nextType();
   let h=`<div class="bar"><div class="seg" role="group" aria-label="Trening">${TYPES.map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
     ${draft.type==="Dom"?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">${draft.minimum?"Minimum · ok. 30 min":"Minimum"}</button>`}</div>
-    <p class="hint">${draft.type==="Dom"?"Trening w domu, ok. 30 min: gumy i hantle, krótkie przerwy. Nie przesuwa kolejki A → B → C.":draft.minimum?"Minimum: same nogi. Lepsze niż nic.":"Kolejny w kolejce: <b>"+nt+"</b>."} Bez walki do upadku: zostaw 1–2 powtórzenia w zapasie.</p>`;
+    <p class="hint">${draft.type==="Dom"?"Trening w domu, ok. 30 min: 3 serie, przerwy 30–45 s. Nie przesuwa kolejki A → B → C.":draft.minimum?"Minimum: same nogi. Lepsze niż nic.":"Kolejny w kolejce: <b>"+nt+"</b>."} Bez walki do upadku: zostaw 1–2 powtórzenia w zapasie.</p>`;
   if(draft.start&&draftHasSets())h+=`<p class="hint num">Trening trwa: <b>${mmss((Date.now()-draft.start)/1000)}</b></p>`;
   for(const sl of activeSlots())h+=slotBlock(sl,sl.id,draft.items[sl.id],false);
   draft.extras.forEach((x,i)=>{h+=slotBlock(null,"x"+i,x,true)});
@@ -587,7 +584,7 @@ document.addEventListener("click",async ev=>{
     if(!draft.force&&missing().length){draft.checked=true;saveDraft();render();const el=$("#missing");if(el)el.scrollIntoView({block:"center"});return}
     saving=true;
     const items=[];
-    for(const sl of activeSlots()){const it=draft.items[sl.id];if(it.skip||!it.sets.some(x=>x!=null))continue;items.push({slot:sl.title,ex:it.ex,w:Math.max(it.w||0,...it.ws.filter(x=>x!=null)),ws:it.ws.slice(0,it.sets.length),sets:it.sets,feel:it.feel,note:it.note||""})}
+    for(const sl of activeSlots()){const it=draft.items[sl.id];if(it.skip||!it.sets.some(x=>x!=null))continue;items.push({slot:sl.id[0]==="d"?"Dom "+sl.title:sl.title,ex:it.ex,w:Math.max(it.w||0,...it.ws.filter(x=>x!=null)),ws:it.ws.slice(0,it.sets.length),sets:it.sets,feel:it.feel,note:it.note||""})}
     for(const x of draft.extras)if(x.ex&&x.sets.some(s=>s!=null))items.push({slot:"Dodatkowe",ex:x.ex,w:Math.max(x.w||0,...x.ws.filter(s=>s!=null)),ws:x.ws.slice(0,x.sets.length),sets:x.sets,feel:x.feel,note:x.note||""});
     if(draft.cardio&&draft.cardio.min>0)items.push({slot:"Cardio",ex:draft.cardio.ex,min:draft.cardio.min,sets:[],ws:[]});
     for(const it of items){while(it.sets.length&&it.sets[it.sets.length-1]==null){it.sets.pop();it.ws.pop()}}
