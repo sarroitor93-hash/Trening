@@ -1,6 +1,6 @@
 // Trening Kinga — service worker: działa offline, nowa wersja przychodzi od razu (najpierw sieć).
-const CACHE = "kinga-v12";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png"];
+const CACHE = "kinga-v13";
+const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith("kinga-") && k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener("fetch", e => {
