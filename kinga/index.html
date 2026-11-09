@@ -133,6 +133,14 @@ html[data-theme="grafit"]{--accent:#2b2f33;--surface-2:#e6e6e6;--bg:#f2f2f2;--li
  html[data-theme="grafit"]:not([data-mode="light"]){--accent:#e0e0e0;--accent-fg:#111;--surface-2:#252525;--bg:#111;--line:#333}}
 html[data-mode="light"]{color-scheme:light}
 .swatch{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+/* Czarne motywy: zawsze ciemne, kolorowe nagłówki i akcenty. */
+html[data-theme^="czarny"][data-theme]{color-scheme:dark;--bg:#000;--surface:#0e0e0e;--surface-2:#1c1c1c;--fg:#f4f4f4;--muted:#9b9b9b;--line:#2a2a2a;--warn:#f0b04a;--warn-bg:#2e230d;--danger:#ff6b6b}
+html[data-theme="czarny-roz"][data-theme]{--accent:#ff4fa0;--accent-fg:#1a0010;--head:#ff4fa0;--done:#ff4fa0;--done-bg:#2b0b1c}
+html[data-theme="czarny-zloto"][data-theme]{--accent:#e8c26a;--accent-fg:#1a1300;--head:#e8c26a;--done:#e8c26a;--done-bg:#2a2210}
+html[data-theme="czarny-mieta"][data-theme]{--accent:#4fe3b4;--accent-fg:#00180f;--head:#4fe3b4;--done:#4fe3b4;--done-bg:#0b2820}
+html[data-theme="czarny-fiolet"][data-theme]{--accent:#b38cff;--accent-fg:#14082b;--head:#b38cff;--done:#b38cff;--done-bg:#1d1430}
+html[data-theme="czarny-czerwien"][data-theme]{--accent:#ff4d5e;--accent-fg:#1a0004;--head:#ff4d5e;--done:#ff4d5e;--done-bg:#2b0b0f}
+h1,.slot-h h2,.card h2{color:var(--head,var(--fg))}
 </style>
 </head>
 <body>
@@ -218,9 +226,9 @@ if(DEMO&&!ls.get("cache",null)){const d=n=>new Date(Date.now()-n*864e5).toISOStr
 const ready=()=>!!(cfg.url&&cfg.key);
 let prefs=Object.assign({snd:true},ls.get("prefs",{}));
 
-const THEMES=[["morska","Morska","#2f7d6d"],["malina","Malinowa","#c2185b"],["lawenda","Lawendowa","#6a4fb3"],["granat","Granatowa","#1f4e8c"],["koral","Koralowa","#d0543a"],["grafit","Grafitowa","#2b2f33"]];
-function applyTheme(){const r=document.documentElement;r.dataset.theme=prefs.theme||"morska";if(prefs.mode==="light")r.dataset.mode="light";else delete r.dataset.mode;
-  const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=(THEMES.find(t=>t[0]===(prefs.theme||"morska"))||THEMES[0])[2]}
+const THEMES=[["czarny-roz","Czarny + róż","#ff4fa0"],["czarny-zloto","Czarny + złoto","#e8c26a"],["czarny-mieta","Czarny + mięta","#4fe3b4"],["czarny-fiolet","Czarny + fiolet","#b38cff"],["czarny-czerwien","Czarny + czerwień","#ff4d5e"],["morska","Morska","#2f7d6d"],["malina","Malinowa","#c2185b"],["lawenda","Lawendowa","#6a4fb3"],["granat","Granatowa","#1f4e8c"],["koral","Koralowa","#d0543a"],["grafit","Grafitowa","#2b2f33"]];
+function applyTheme(){const r=document.documentElement;r.dataset.theme=prefs.theme||"czarny-roz";if(prefs.mode==="light")r.dataset.mode="light";else delete r.dataset.mode;
+  const th=prefs.theme||"czarny-roz",m=document.querySelector('meta[name="theme-color"]');if(m)m.content=th.startsWith("czarny")?"#000000":(THEMES.find(t=>t[0]===th)||THEMES[0])[2]}
 applyTheme();
 if(DEMO)document.getElementById("demo").hidden=false;
 
@@ -420,14 +428,14 @@ function renderHist(){
   return h+`</section>`;
 }
 function renderSettings(){return `<section class="card"><h2>Ustawienia</h2>
-  <span class="lbl">Kolor</span><div class="chips" style="flex-wrap:wrap">${THEMES.map(([k,l,c])=>`<button class="chip" data-theme="${k}" aria-pressed="${(prefs.theme||"morska")===k}"><span class="swatch" style="background:${c}"></span>${l}</button>`).join("")}</div>
-  <span class="lbl">Tryb</span><div class="chips" style="flex-wrap:wrap"><button class="chip" data-mode="auto" aria-pressed="${prefs.mode!=="light"}">Jak w telefonie (jasny/ciemny)</button><button class="chip" data-mode="light" aria-pressed="${prefs.mode==="light"}">Zawsze jasny</button></div>
+  <span class="lbl">Kolor</span><div class="chips" style="flex-wrap:wrap">${THEMES.map(([k,l,c])=>`<button class="chip" data-theme="${k}" aria-pressed="${(prefs.theme||"czarny-roz")===k}"><span class="swatch" style="background:${c}"></span>${l}</button>`).join("")}</div>
+  ${(prefs.theme||"czarny-roz").startsWith("czarny")?"":`<span class="lbl">Tryb</span><div class="chips" style="flex-wrap:wrap"><button class="chip" data-mode="auto" aria-pressed="${prefs.mode!=="light"}">Jak w telefonie (jasny/ciemny)</button><button class="chip" data-mode="light" aria-pressed="${prefs.mode==="light"}">Zawsze jasny</button></div>`}
   <span class="lbl">Dźwięk końca przerwy</span><div class="chips"><button class="chip" id="snd" aria-pressed="${prefs.snd}">${prefs.snd?"Włączony":"Wyłączony"}</button></div>
   <span class="lbl">Gdy telefon jest wyciszony</span><div class="chips"><button class="chip" id="loud" aria-pressed="${!!prefs.loud}">${prefs.loud?"Graj mimo wyciszenia":"Nie graj"}</button></div>
   <p class="hint">„Graj mimo wyciszenia” działa na iPhonie także przy przełączniku wyciszenia, ale zatrzymuje muzykę z innych aplikacji (np. Spotify). Dźwięk gra tylko przy włączonym ekranie: aplikacja próbuje nie wygaszać ekranu w trakcie przerwy.</p></section>
   ${renderConn()}<button class="primary" id="close-settings">Gotowe</button>`}
 function renderConn(){return `<section class="card"><h2>Arkusz Google</h2>
-  <p class="hint">${ready()?"Treningi zapisują się w arkuszu „Trening Kinga” na Dysku Igora.":"Brak adresu skryptu. Poproś Igora o ustawienie połączenia."}</p>
+  <p class="hint">${DEMO?"To podgląd: połączenie z arkuszem jest wyłączone, nic się nie zapisuje.":ready()?"Treningi zapisują się w arkuszu „Trening Kinga” na Dysku Igora.":"Brak adresu skryptu. Poproś Igora o ustawienie połączenia."}</p>
   <details><summary style="font-size:15px">Zmień połączenie</summary><div style="display:grid;gap:8px;margin-top:8px">
   <input class="name" id="cfg-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url||"")}">
   <input class="name" id="cfg-key" placeholder="Klucz" value="${esc(cfg.key||"")}"><button class="ghost" id="cfg-save">Połącz</button></div></details></section>`}
