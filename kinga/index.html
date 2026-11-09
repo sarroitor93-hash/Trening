@@ -380,6 +380,7 @@ function slotBlock(sl,key,it,extra){
   const nameIn=(extra||custom||it.other)?`<input class="name" data-name-for="${key}" placeholder="Wpisz nazwę ćwiczenia" value="${esc(custom||extra?it.ex:"")}">`:"";
   const unitW=ex.wl||"kg",repU=ex.unit==="sek"?"sekundy":"powt.";
   return `<section class="slot ${allDone?"done":""}"><div class="slot-h"><h2>${esc(extra?"Dodatkowe":sl.title)}${sl&&sl.opt?" · opcja":""}</h2><span class="target num">${n} × ${ex.lo}–${ex.hi}${ex.unit==="sek"?" s":""}</span></div>
+    ${!extra?`<div class="restctl">Przerwa <button class="mini" data-rdec="${key}" aria-label="Krócej">−</button><b class="num">${mmss(restFor(sl,it.ex))}</b><button class="mini" data-rinc="${key}" aria-label="Dłużej">+</button><button class="mini" data-rest="${key}">▶ Start</button>${restCfg[it.ex]!=null&&restCfg[it.ex]!==sl.rest?`<button class="mini" data-rdef="${key}">domyślna ${mmss(sl.rest)}</button>`:""}</div>`:""}
     ${extra?"":`<div class="exname">${esc(it.ex)}</div>`}
     ${chips}${nameIn}
     ${!extra&&!custom?`<div class="meta num">${lastTxt?`<span>${lastTxt}</span>`:""}<span class="sug ${s.dir>0?"up":""}">${esc(s.txt)}</span></div>`:""}
@@ -388,7 +389,7 @@ function slotBlock(sl,key,it,extra){
     ${done?`<div><span class="lbl">Jak było?</span><div class="feel" style="margin-top:6px">${Object.keys(FEEL).map(k=>`<button data-feel="${key}" data-v="${k}" aria-pressed="${it.feel===k}">${FEEL[k]}</button>`).join("")}</div></div>`:""}
     ${it.noteOpen||it.note?`<input class="name" data-note-for="${key}" placeholder="Notatka, np. ustawienie maszyny, odczucia" value="${esc(it.note||"")}">`:""}
     <div class="tools"><button class="mini" data-addset="${key}">+ seria</button><button class="mini" data-noteopen="${key}">✎ notatka</button>${extra?`<button class="mini" data-rmx="${key}">Usuń</button>`:`<button class="mini" data-skip="${key}">Pomiń</button>`}</div>
-    ${!extra?`<div class="restctl">Przerwa <button class="mini" data-rdec="${key}" aria-label="Krócej">−</button><b class="num">${mmss(restFor(sl,it.ex))}</b><button class="mini" data-rinc="${key}" aria-label="Dłużej">+</button><button class="mini" data-rest="${key}">▶ Start</button>${restCfg[it.ex]!=null&&restCfg[it.ex]!==sl.rest?`<button class="mini" data-rdef="${key}">domyślna ${mmss(sl.rest)}</button>`:""}</div>`:""}
+
   </section>`;
 }
 function renderTrening(){
