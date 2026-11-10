@@ -180,20 +180,20 @@ const ls={get(k,d){try{const v=localStorage.getItem(NS+k);return v?JSON.parse(v)
 // unit: "kg" (ciężar), "sek" (czas), "bw" (masa ciała, same powtórzenia). inc = skok ciężaru przy podpowiedzi. assist = maszyna ze wspomaganiem (mniej = trudniej).
 const E=(n,lo,hi,o)=>Object.assign({n,lo,hi,unit:"kg",inc:5,step:2.5},o||{});
 const SLOTS=[
-  {id:"pos",title:"Pośladki",sets:3,rest:120,min:true,ex:[
-    E("Hip thrust na maszynie",10,12),
-    E("Hip thrust ze sztangą",10,12,{wl:"kg (sztanga + talerze)"}),
-    E("Odwodzenie nóg na maszynie",15,20),
-    E("Wyprost bioder na ławce 45°",12,15,{inc:2.5,wl:"kg dodatkowo (talerz)"})]},
-  {id:"czw",title:"Przód uda",sets:3,rest:120,min:true,ex:[
+  {id:"czw",title:"Przód uda",sets:3,rest:90,min:true,ex:[
+    E("Suwnica pozioma (siedząca)",10,12),
     E("Suwnica 45°",10,12,{inc:10,step:5}),
     E("Wyprost nóg na maszynie",12,15),
-    E("Suwnica pozioma (siedząca)",10,12),
     E("Hack squat",10,12),
     E("Suwnica jednonóż",10,12,{wl:"kg · na nogę"})]},
+  {id:"pos",title:"Pośladki",sets:3,rest:90,min:true,ex:[
+    E("Odwodzenie nóg na maszynie",15,20),
+    E("Hip thrust na maszynie",10,12),
+    E("Hip thrust ze sztangą",10,12,{wl:"kg (sztanga + talerze)"}),
+    E("Wyprost bioder na ławce 45°",12,15,{inc:2.5,wl:"kg dodatkowo (talerz)"})]},
   {id:"dwu",title:"Tył uda",sets:3,rest:90,min:true,ex:[
-    E("Uginanie nóg siedząc",10,15),
     E("Uginanie nóg leżąc",10,15),
+    E("Uginanie nóg siedząc",10,15),
     E("Uginanie nogi stojąc (jednonóż)",10,15,{inc:2.5,wl:"kg · na nogę"}),
     E("RDL z hantlami",10,12,{inc:2,step:1,wl:"kg · 1 hantla"}),
     E("Uginanie nóg na piłce fitness",10,15,{unit:"bw"})]},
@@ -247,7 +247,9 @@ const DOM=[
     E("Deska bokiem (na stronę)",20,40,{unit:"sek"}),
     E("Łódka (hollow hold)",15,30,{unit:"sek"})]}
 ];
-const SESS=["A","B","C"],TYPES=["A","B","C","Dom"];
+// Na razie jeden trening na siłowni (plan A/B/C jest w dokumencie projektu, wróci później).
+const SESS=["Trening"],TYPES=["Trening","Dom"];
+const isDom=sl=>!!sl&&/^d\d/.test(sl.id);
 const slotsOf=type=>type==="Dom"?DOM:SLOTS;
 const CARDIO=["Rower","Bieżnia pod górę","Orbitrek"];
 const findEx=(sl,name)=>sl.ex.find(e=>e.n===name)||Object.assign({},sl.ex[0],{n:name,custom:true});
@@ -366,10 +368,11 @@ function suggest(ex,last){
   return {w,r,txt:word+" ("+why+")",dir:k>0?1:k<0?-1:0};
 }
 function firstDate(){const w=workouts();return w.length?new Date(w[w.length-1].date).getTime():null}
-function nextType(){const w=workouts().find(e=>SESS.includes(e.type));if(!w)return "A";const i=SESS.indexOf(w.type);return i<0?"A":SESS[(i+1)%SESS.length]}
+function nextType(){return "Trening"}
 
 // ---------- Bieżący trening ----------
 let draft=ls.get("draft",null);
+if(draft&&!["Trening","Dom"].includes(draft.type)){const has=Object.values(draft.items||{}).some(i=>!i.skip&&(i.sets||[]).some(x=>x!=null));if(has)draft.type="Trening";else draft=null}
 function saveDraft(){if(draft)delete draft.auto;ls.set("draft",draft)}
 function setsFor(sl){return sl.sets}
 function freshItem(sl,ex){const last=lastFor(ex.n),s=suggest(ex,last);
@@ -419,9 +422,9 @@ function slotBlock(sl,key,it,extra){
   const chips=extra?"":`<div class="chips">${sl.ex.map((e,i)=>`<button class="chip" data-pick="${key}" data-i="${i}" aria-pressed="${e.n===it.ex}">${i+1}. ${esc(e.n)}</button>`).join("")}<button class="chip" data-other="${key}" aria-pressed="${custom||!!it.other}">Inne…</button></div>`;
   const nameIn=(extra||custom||it.other)?`<input class="name" data-name-for="${key}" placeholder="Wpisz nazwę ćwiczenia" value="${esc(custom||extra?it.ex:"")}">`:"";
   const unitW=ex.wl||"kg",repU=ex.unit==="sek"?"sekundy":"powt.";
-  return `<section class="slot ${allDone?"done":""}"><div class="slot-h"><h2>${esc(extra?"Dodatkowe":sl.id[0]==="d"?sl.title+" · "+it.ex:sl.title)}${sl&&sl.opt?" · opcja":""}</h2><span class="target num">${n} × ${ex.lo}–${ex.hi}${ex.unit==="sek"?" s":""}</span></div>
+  return `<section class="slot ${allDone?"done":""}"><div class="slot-h"><h2>${esc(extra?"Dodatkowe":isDom(sl)?sl.title+" · "+it.ex:sl.title)}${sl&&sl.opt?" · opcja":""}</h2><span class="target num">${n} × ${ex.lo}–${ex.hi}${ex.unit==="sek"?" s":""}</span></div>
     ${!extra?`<div class="restctl">Przerwa <button class="mini" data-rdec="${key}" aria-label="Krócej">−</button><b class="num">${mmss(restFor(sl,it.ex))}</b><button class="mini" data-rinc="${key}" aria-label="Dłużej">+</button><button class="mini" data-rest="${key}">▶ Start</button>${restCfg[it.ex]!=null&&restCfg[it.ex]!==sl.rest?`<button class="mini" data-rdef="${key}">domyślna ${mmss(sl.rest)}</button>`:""}</div>`:""}
-    ${extra||sl.id[0]==="d"?"":`<div class="exname">${esc(it.ex)}</div>`}
+    ${extra||isDom(sl)?"":`<div class="exname">${esc(it.ex)}</div>`}
     ${chips}${nameIn}
     ${!extra&&!custom?`<div class="meta num">${lastTxt?`<span>${lastTxt}</span>`:""}<span class="sug ${s.dir>0?"up":""}">${esc(s.txt)}</span></div>`:""}
     <div class="row ${ex.unit==="kg"?"":"one"}">${ex.unit==="kg"?stepper("w-"+key,it.w,unitW):""}<div class="reps">${stepper("r-"+key,it.r,repU)}</div></div>
@@ -437,7 +440,7 @@ function renderTrening(){
   const nt=nextType();
   let h=`<div class="bar"><div class="seg" role="group" aria-label="Trening">${TYPES.map(t=>`<button data-type="${t}" aria-pressed="${draft.type===t}">${t}</button>`).join("")}</div>
     ${draft.type==="Dom"?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">${draft.minimum?"Minimum · ok. 30 min":"Minimum"}</button>`}</div>
-    <p class="hint">${draft.type==="Dom"?"Trening w domu, ok. 30 min: 3 serie, przerwy 30–45 s. Nie przesuwa kolejki A → B → C.":draft.minimum?"Minimum: same nogi. Lepsze niż nic.":"Kolejny w kolejce: <b>"+nt+"</b>."} Bez walki do upadku: zostaw 1–2 powtórzenia w zapasie.</p>`;
+    <p class="hint">${draft.type==="Dom"?"Trening w domu, ok. 30 min: 3 serie, przerwy 30–45 s.":draft.minimum?"Minimum: same nogi. Lepsze niż nic.":"Kolejność ćwiczeń dowolna. Maszyna zajęta? Wybierz inną wersję."} Bez walki do upadku: zostaw 1–2 powtórzenia w zapasie.</p>`;
   if(draft.start&&draftHasSets())h+=`<p class="hint num">Trening trwa: <b>${mmss((Date.now()-draft.start)/1000)}</b></p>`;
   for(const sl of activeSlots())h+=slotBlock(sl,sl.id,draft.items[sl.id],false);
   draft.extras.forEach((x,i)=>{h+=slotBlock(null,"x"+i,x,true)});
@@ -451,7 +454,7 @@ function renderTrening(){
     <button class="primary" id="save" ${draftHasSets()?"":"disabled"}>Zapisz trening</button>
     <button class="ghost" id="reset" style="margin-top:20px">Wyczyść bieżący trening</button>
     <details class="card"><summary>Zasady</summary><ul>
-      <li>Kolejność: A → B → C. Między treningami najlepiej dzień przerwy.</li>
+      <li>Między treningami najlepiej dzień przerwy. Kolejność ćwiczeń dowolna.</li>
       <li>Rozgrzewka: 5 min roweru + 1–2 lekkie serie pierwszego ćwiczenia.</li>
       <li>Po ćwiczeniu zaznacz: lekko, średnio albo ciężko. Na tej podstawie aplikacja podpowie ciężar następnym razem.</li>
       <li>Lekko → +2 skoki ciężaru. Średnio → +1 skok. Ciężko → ten sam ciężar. Jeśli zabrakło powtórzeń do dolnej granicy, nie dokładamy.</li>
@@ -584,7 +587,7 @@ document.addEventListener("click",async ev=>{
     if(!draft.force&&missing().length){draft.checked=true;saveDraft();render();const el=$("#missing");if(el)el.scrollIntoView({block:"center"});return}
     saving=true;
     const items=[];
-    for(const sl of activeSlots()){const it=draft.items[sl.id];if(it.skip||!it.sets.some(x=>x!=null))continue;items.push({slot:sl.id[0]==="d"?"Dom "+sl.title:sl.title,ex:it.ex,w:Math.max(it.w||0,...it.ws.filter(x=>x!=null)),ws:it.ws.slice(0,it.sets.length),sets:it.sets,feel:it.feel,note:it.note||""})}
+    for(const sl of activeSlots()){const it=draft.items[sl.id];if(it.skip||!it.sets.some(x=>x!=null))continue;items.push({slot:isDom(sl)?"Dom "+sl.title:sl.title,ex:it.ex,w:Math.max(it.w||0,...it.ws.filter(x=>x!=null)),ws:it.ws.slice(0,it.sets.length),sets:it.sets,feel:it.feel,note:it.note||""})}
     for(const x of draft.extras)if(x.ex&&x.sets.some(s=>s!=null))items.push({slot:"Dodatkowe",ex:x.ex,w:Math.max(x.w||0,...x.ws.filter(s=>s!=null)),ws:x.ws.slice(0,x.sets.length),sets:x.sets,feel:x.feel,note:x.note||""});
     if(draft.cardio&&draft.cardio.min>0)items.push({slot:"Cardio",ex:draft.cardio.ex,min:draft.cardio.min,sets:[],ws:[]});
     for(const it of items){while(it.sets.length&&it.sets[it.sets.length-1]==null){it.sets.pop();it.ws.pop()}}
