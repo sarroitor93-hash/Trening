@@ -249,7 +249,9 @@ const DOM=[
 ];
 // Na razie jeden trening na siłowni (plan A/B/C jest w dokumencie projektu, wróci później).
 // Zakres 8–12 i domyślnie 10 powtórzeń we wszystkich ćwiczeniach z ciężarem (decyzja Igora po 1. treningu).
-for(const sl of SLOTS.concat(DOM))for(const e of sl.ex)if(e.unit==="kg"){e.lo=8;e.hi=12}
+for(const sl of SLOTS)for(const e of sl.ex)if(e.unit==="kg"){e.lo=8;e.hi=12}
+// W domu są tylko małe hantle: ciężar się nie zmienia, postęp = więcej powtórzeń (12–20).
+for(const sl of DOM)for(const e of sl.ex)if(e.unit==="kg"){e.lo=12;e.hi=20;e.repProg=true}
 const DEF_REPS=10;
 const SESS=["Trening"],TYPES=["Trening","Dom"];
 const isDom=sl=>!!sl&&/^d\d/.test(sl.id);
@@ -351,8 +353,11 @@ const workouts=()=>entries.filter(e=>e.items&&e.items.length);
 function lastFor(name){for(const e of workouts()){const it=e.items.find(i=>i.ex===name&&(i.sets||[]).some(x=>x!=null));if(it)return Object.assign({date:e.date},it)}return null}
 const topW=it=>Math.max(it.w||0,...((it.ws||[]).filter(x=>x!=null)));
 function suggest(ex,last){
-  if(!last)return {w:ex.unit==="kg"?null:undefined,r:ex.unit==="kg"?DEF_REPS:ex.lo,txt:ex.unit==="kg"?"Pierwszy raz: dobierz ciężar tak, żeby było „średnio”":ex.unit==="sek"?"Pierwszy raz: tyle sekund, żeby było „średnio”":"Pierwszy raz: dobierz gumę i powtórzenia tak, żeby było „średnio”",dir:0};
+  if(!last)return {w:ex.unit==="kg"?null:undefined,r:ex.unit==="kg"&&!ex.repProg?DEF_REPS:ex.lo,txt:ex.repProg?"Wpisz ciężar hantli i zrób tyle powtórzeń, żeby było „średnio”":ex.unit==="kg"?"Pierwszy raz: dobierz ciężar tak, żeby było „średnio”":ex.unit==="sek"?"Pierwszy raz: tyle sekund, żeby było „średnio”":"Pierwszy raz: dobierz gumę/wersję i powtórzenia tak, żeby było „średnio”",dir:0};
   const done=(last.sets||[]).filter(x=>x!=null),minR=Math.min(...done),maxR=Math.max(...done),f=last.feel;
+  if(ex.repProg){const add=f==="lekko"?2:f==="srednio"?1:0,w=topW(last);
+    if(add&&maxR>=ex.hi)return {w,r:ex.hi,txt:`↑ ${ex.hi}+ powt. przy ${fmt(w)} kg: czas na cięższą hantlę albo wolniejsze tempo`,dir:1};
+    const r=Math.min(Math.max(maxR+add,ex.lo),ex.hi);return {w,r,txt:add?`↑ dziś ${r} powt. z ${fmt(w)} kg (ost. ${maxR}, ${FEEL[f].toLowerCase()})`:`Dziś jak ostatnio: ${maxR} powt. z ${fmt(w)} kg`,dir:add?1:0}}
   if(ex.unit!=="kg"){const add=ex.unit==="sek"?(f==="lekko"?10:f==="srednio"?5:0):(f==="lekko"?2:f==="srednio"?1:0);
     if(ex.unit==="bw"&&add&&maxR>=ex.hi)return {r:ex.lo,txt:`↑ mocniejsza guma albo trudniejsza wersja (ost. ${maxR} powt., ${FEEL[f].toLowerCase()})`,dir:1};
     const r=Math.min(Math.max(maxR+add,ex.lo),ex.unit==="sek"?120:Math.max(30,ex.hi));return {r,txt:add?`↑ dziś ${r} ${ex.unit==="sek"?"s":"powt."} (ost. ${maxR}, ${FEEL[f].toLowerCase()})`:`Dziś jak ostatnio: ${maxR}`,dir:add?1:0}}
