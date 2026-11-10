@@ -248,6 +248,9 @@ const DOM=[
     E("Łódka (hollow hold)",15,30,{unit:"sek"})]}
 ];
 // Na razie jeden trening na siłowni (plan A/B/C jest w dokumencie projektu, wróci później).
+// Zakres 8–12 i domyślnie 10 powtórzeń we wszystkich ćwiczeniach z ciężarem (decyzja Igora po 1. treningu).
+for(const sl of SLOTS.concat(DOM))for(const e of sl.ex)if(e.unit==="kg"){e.lo=8;e.hi=12}
+const DEF_REPS=10;
 const SESS=["Trening"],TYPES=["Trening","Dom"];
 const isDom=sl=>!!sl&&/^d\d/.test(sl.id);
 const slotsOf=type=>type==="Dom"?DOM:SLOTS;
@@ -348,7 +351,7 @@ const workouts=()=>entries.filter(e=>e.items&&e.items.length);
 function lastFor(name){for(const e of workouts()){const it=e.items.find(i=>i.ex===name&&(i.sets||[]).some(x=>x!=null));if(it)return Object.assign({date:e.date},it)}return null}
 const topW=it=>Math.max(it.w||0,...((it.ws||[]).filter(x=>x!=null)));
 function suggest(ex,last){
-  if(!last)return {w:ex.unit==="kg"?null:undefined,r:ex.lo,txt:ex.unit==="kg"?"Pierwszy raz: dobierz ciężar tak, żeby było „średnio”":ex.unit==="sek"?"Pierwszy raz: tyle sekund, żeby było „średnio”":"Pierwszy raz: dobierz gumę i powtórzenia tak, żeby było „średnio”",dir:0};
+  if(!last)return {w:ex.unit==="kg"?null:undefined,r:ex.unit==="kg"?DEF_REPS:ex.lo,txt:ex.unit==="kg"?"Pierwszy raz: dobierz ciężar tak, żeby było „średnio”":ex.unit==="sek"?"Pierwszy raz: tyle sekund, żeby było „średnio”":"Pierwszy raz: dobierz gumę i powtórzenia tak, żeby było „średnio”",dir:0};
   const done=(last.sets||[]).filter(x=>x!=null),minR=Math.min(...done),maxR=Math.max(...done),f=last.feel;
   if(ex.unit!=="kg"){const add=ex.unit==="sek"?(f==="lekko"?10:f==="srednio"?5:0):(f==="lekko"?2:f==="srednio"?1:0);
     if(ex.unit==="bw"&&add&&maxR>=ex.hi)return {r:ex.lo,txt:`↑ mocniejsza guma albo trudniejsza wersja (ost. ${maxR} powt., ${FEEL[f].toLowerCase()})`,dir:1};
@@ -363,7 +366,7 @@ function suggest(ex,last){
   else if(minR>=ex.hi){k=1;why="wszystkie serie na górze zakresu"}
   else why="brak oceny";
   let w=Math.max(0,Math.round((w0+sgn*k*ex.inc)*10)/10);
-  const dir=k*sgn===0?0:(k>0?1:-1),r=k>0?ex.lo:Math.min(Math.max(done[0],ex.lo),ex.hi);
+  const dir=k*sgn===0?0:(k>0?1:-1),r=DEF_REPS;
   const word=k>0?(ex.assist?"↑ trudniej: dziś "+fmt(w)+" kg wspomagania":"↑ dziś "+fmt(w)+" kg"):k<0?(ex.assist?"↓ łatwiej: dziś "+fmt(w)+" kg wspomagania":"↓ dziś "+fmt(w)+" kg"):"Dziś ten sam ciężar: "+fmt(w)+" kg";
   return {w,r,txt:word+" ("+why+")",dir:k>0?1:k<0?-1:0};
 }
