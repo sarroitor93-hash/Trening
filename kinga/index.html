@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Trening Kinga</title>
 <meta name="theme-color" content="#2f7d6d">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -25,7 +25,9 @@
   --bg:#0f1414; --surface:#171d1d; --surface-2:#212929; --fg:#e7eeec; --muted:#97a5a3; --line:#2b3535;
   --accent:#5cc3ad; --accent-fg:#06201a; --done:#4cc785; --done-bg:#16301f; --warn:#f0b04a; --warn-bg:#33270f; --danger:#f28b82; color-scheme:dark}}
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;touch-action:manipulation}
+/* Bez powiększania ekranu podwójnym stuknięciem (szybkie stukanie +/− i serii). */
+*{touch-action:manipulation}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:env(safe-area-inset-top,0px) 110px}
 .wrap{max-width:560px;margin:0 auto}
@@ -610,6 +612,9 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&ready())f
 setInterval(()=>{if(tab==="trening"&&draft&&draft.start&&!document.activeElement.matches("input")){const el=document.querySelector("main .hint.num b");if(el)el.textContent=mmss((Date.now()-draft.start)/1000)}},1000);
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 // Na potrzeby testów
+// iOS: zablokuj powiększanie gestem i podwójnym stuknięciem.
+document.addEventListener("gesturestart",e=>e.preventDefault());
+let lastTouch=0;document.addEventListener("touchend",e=>{const n=Date.now();if(n-lastTouch<350&&!e.target.closest("input,textarea")){e.preventDefault();const b=e.target.closest("button");if(b)b.click()}lastTouch=n},{passive:false});
 window.__K={suggest,E,SLOTS};
 load();
 })();
