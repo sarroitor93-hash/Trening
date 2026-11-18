@@ -170,6 +170,7 @@ details ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--muted);di
 "use strict";
 const $=s=>document.querySelector(s);
 const fmt=n=>(Math.round(n*10)/10).toString().replace(".",",");
+const stripGym=t=>String(t||"").replace(/^(\s*@[^|]+\|\s?)+/,"");
 const parse=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:null};
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 
@@ -203,7 +204,7 @@ function legacyPlan(type){
   const A=type==="A", C=type==="C", up=4;
   const sila=A?{key:"silaA",label:"Zawias",opts:["Martwy ciąg"],def:0,sets:4,lo:3,hi:5,unit:"kg",step:2.5}
     :C?{key:"silaC",label:"Zawias / nogi",opts:["RDL","Suwnica","Przysiad hack"],def:0,sets:4,lo:6,hi:10,unit:"kg",step:2.5}
-    :{key:"silaB",label:"Przysiad",opts:["Przysiad hack","Suwnica","Przysiad ze sztangą"],def:0,sets:4,lo:5,hi:6,unit:"kg",step:2.5};
+    :{key:"silaB",label:"Przysiad",opts:["Przysiad hack","Suwnica","Przysiad ze sztangą","Przysiad na maszynie – talerze"],def:0,sets:4,lo:5,hi:6,unit:"kg",step:2.5};
   return [
     {id:"skoki",rest:60,title:"0 · Skoki",rule:"maks. wysokość · zejście krokiem · odpoczynek 1 min",nofail:true,min:false,
      ex:[{key:"skoki",label:"Moc",opts:["Wskok na skrzynię","Skok w dal"],def:0,sets:3,lo:5,hi:5,unit:"cm",step:5,noProg:true}]},
@@ -233,7 +234,7 @@ let entries=[];
 let cfg=ls.get("cfg",{url:"",key:""});
 const GMODE=()=>cfg.mode==="google";
 let PLAN=ls.get("plan",null)||defaultPlan();
-(function(){const add=[["Uginanie – linka","Uginanie bayesowskie – brama (oburącz)"],["Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"],["Uginanie nóg siedząc (maszyna)","RDL – hantle"],["Uginanie nóg siedząc (maszyna)","Wyprosty na ławce rzymskiej"],...NOGI_ALT.map(n=>["Uginanie nóg siedząc (maszyna)",n]),["Wyciskanie hantli – skos","Wyciskanie na maszynie – talerze (na rękę)"],["Wiosłowanie linką (dół)","Wiosłowanie na maszynie z oparciem – talerze (na rękę)"]];let ch=false;
+(function(){const add=[["Uginanie – linka","Uginanie bayesowskie – brama (oburącz)"],["Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"],["Uginanie nóg siedząc (maszyna)","RDL – hantle"],["Uginanie nóg siedząc (maszyna)","Wyprosty na ławce rzymskiej"],...NOGI_ALT.map(n=>["Uginanie nóg siedząc (maszyna)",n]),["Wyciskanie hantli – skos","Wyciskanie na maszynie – talerze (na rękę)"],["Wiosłowanie linką (dół)","Wiosłowanie na maszynie z oparciem – talerze (na rękę)"],["Przysiad ze sztangą","Przysiad na maszynie – talerze"]];let ch=false;
   for(const se of PLAN.sessions||[])for(const sl of se.slots||[])for(const e of sl.ex||[])for(const [k,n] of add)if(e.opts&&e.opts.includes(k)&&!e.opts.includes(n)){e.opts.push(n);ch=true}
   if(ch&&ls.get("plan",null))ls.set("plan",PLAN)})();
 (function(){const m=location.hash.match(/k=([A-Za-z0-9_-]+)/);if(m){cfg.key=m[1];ls.set("cfg",cfg);history.replaceState(null,"",location.pathname)}})();
@@ -248,7 +249,7 @@ function build(d){
     if(!e){e=byId[id]={id,kind:"sila",date:r[0],type:String(r[1]),minimum:r[2]==="minimum",items:[]};out.push(e)}
     const sets=r.slice(6,11).map(nz); while(sets.length&&sets[sets.length-1]==null) sets.pop();
     if(r[18]!==""&&r[18]!=null)e.durMin=Number(r[18]);
-    if(r[19]!==""&&r[19]!=null){const nt=String(r[19]),m=nt.match(/^@([^|]+)\|\s?([\s\S]*)$/);if(m){e.gym=m[1].trim();e.note=m[2]}else{e.note=nt;if(/zdrofit/i.test(nt))e.gym="Zdrofit Pruszków";else if(/city ?fit/i.test(nt))e.gym="City Fit Siedlce"}}
+    if(r[19]!==""&&r[19]!=null){const nt=String(r[19]),m=nt.match(/^@([^|]+)\|\s?([\s\S]*)$/);if(m){e.gym=m[1].trim();e.note=stripGym(m[2])}else{e.note=nt;if(/zdrofit/i.test(nt))e.gym="Zdrofit Pruszków";else if(/city ?fit/i.test(nt))e.gym="City Fit Siedlce"}}
     const it={key:String(r[3]),ex:String(r[4]),w:Number(r[5])||0,sets};
     if(r[15]!==""&&r[15]!=null){const ws=String(r[15]).split("/").map(x=>Number(String(x).replace(",",".")));if(ws.length)it.ws=ws}
     if(r[16]!==""&&r[16]!=null){it.mode="time";it.min=Number(r[16])}
@@ -353,7 +354,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list)).then(()=>oneTimeFix9(list));
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list)).then(()=>oneTimeFix9(list)).then(()=>oneTimeFix10(list));
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -432,6 +433,13 @@ async function oneTimeFix9(list){
   const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+(e.note||"");
   for(const it of fixed.items){if(it.key==="klatka"){it.ex="Wyciskanie na maszynie – talerze (na rękę)";it.w=40;it.note=""}if(it.key==="plecy"){it.ex="Wiosłowanie na maszynie z oparciem – talerze (na rękę)";it.w=40;it.note=""}}
   ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem 7.11: nazwy maszyn, wiosłowanie 40 kg na rękę")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
+}
+async function oneTimeFix10(list){
+  const FIX="fix-18-11-przysiad-maszyna"; if(ls.get(FIX,false)) return;
+  const e=list.find(x=>x.id==="smwlrc2vrgcag"); if(!e||!e.items.some(i=>i.ex==="Squat machine")){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+stripGym(e.note);
+  for(const it of fixed.items)if(it.ex==="Squat machine"){it.ex="Przysiad na maszynie – talerze";it.note="ciężar = same talerze (maszyna pusta ok. 18 kg)"}
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem 18.11: nazwa przysiadu na maszynie")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
@@ -706,7 +714,7 @@ function render(){const y=window.scrollY;$("#main").innerHTML=!ready()||tab==="s
 
 // ---------- Szablony planów ----------
 const OHP=["Wyciskanie nad głowę – sztanga","Wyciskanie nad głowę – hantle","Wyciskanie nad głowę – maszyna"];
-const SQ=["Przysiad ze sztangą","Przysiad hack","Suwnica"],HINGE=["Martwy ciąg","RDL"],ROWB=["Wiosłowanie sztangą","Wiosłowanie hantlą","Wiosłowanie linką (dół)"];
+const SQ=["Przysiad ze sztangą","Przysiad hack","Suwnica","Przysiad na maszynie – talerze"],HINGE=["Martwy ciąg","RDL"],ROWB=["Wiosłowanie sztangą","Wiosłowanie hantlą","Wiosłowanie linką (dół)"];
 const PULLV=["Podciąganie","Ściąganie drążka / linki"],LUNGE=["Wykroki","Wykroki bułgarskie (na nogę)","Suwnica"],CALF=["Wznosy na łydki stojąc","Wznosy na łydki siedząc"];
 const RDLs=["RDL","Martwy ciąg"];
 function X(label,opts,sets,lo,hi,o){return Object.assign({key:rid("e"),label,opts:opts.slice(),def:0,sets,lo,hi,unit:"kg",step:2.5},o||{})}
@@ -1008,7 +1016,7 @@ document.addEventListener("click",async ev=>{
     savingNow=true; b.disabled=true; b.textContent="Zapisuję…";
     const items=allItems().filter(([k,it])=>it.mode==="time"?it.min>0:it.sets.some(x=>x!=null)).map(([k,it])=>it.mode==="time"?{key:k,ex:it.ex,mode:"time",min:it.min,note:it.note||"",sets:[]}:{key:k,ex:it.ex,w:Math.max(it.w||0,...(it.ws||[]).filter(x=>x!=null)),ws:(it.ws||[]).slice(0,it.sets.length),sets:it.sets,note:it.note||""});
     const editId=draft.editId;
-    const entry={kind:"sila",type:draft.type,minimum:draft.type!=="Dom"&&draft.minimum,items,note:(draft.gym&&draft.type!=="Dom"?"@"+draft.gym+" | ":"")+(draft.note||""),durMin:editId?draft.durMin:(draft.start?Math.round((Date.now()-draft.start)/60000):0)};
+    const entry={kind:"sila",type:draft.type,minimum:draft.type!=="Dom"&&draft.minimum,items,note:(draft.gym&&draft.type!=="Dom"?"@"+draft.gym+" | ":"")+stripGym(draft.note),durMin:editId?draft.durMin:(draft.start?Math.round((Date.now()-draft.start)/60000):0)};
     if(editId) entry.date=draft.editDate;
     ls.del("draft"); ls.del("draftUndo"); draft=null; stopRest(); setTimeout(clearNotif,120);
     try{await addEntry(entry); if(editId){await removeEntry(editId)} toast(editId?"Poprawiono trening w arkuszu":"Zapisano w arkuszu · "+items.length+" ćw.")}
