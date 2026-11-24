@@ -176,7 +176,7 @@ const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}
 
 // ---------- Plan v1.2 ----------
 const KLATKA=["Wyciskanie hantli – skos","Wyciskanie hantli – płasko","Wyciskanie na maszynie","Wyciskanie sztangi – płasko","Wyciskanie sztangi – skos","Wyciskanie na maszynie – talerze (na rękę)","Wyciskanie na maszynie – skos"];
-const PLECY=["Ściąganie drążka / linki","Wiosłowanie hantlą","Wiosłowanie linką (dół)","Podciąganie","Wiosłowanie na maszynie z oparciem – talerze (na rękę)"];
+const PLECY=["Ściąganie drążka / linki","Wiosłowanie hantlą","Wiosłowanie linką (dół)","Podciąganie","Wiosłowanie na maszynie z oparciem – talerze (na rękę)","Ściąganie – maszyna rozbieżna (Precor)"];
 const UGIN=["Uginanie nóg siedząc (maszyna)","Uginanie nóg leżąc (maszyna)"];
 const PROST=["Prostowanie nóg (maszyna)"];
 const NOGI_ALT=["Nordic curl (opuszczanie)","Uginanie nóg na piłce / ślizgach","Przysiad hack","Wykroki bułgarskie","Wykroki chodzone","Wejścia na skrzynię","Suwnica jednonóż","Przysiad sissy"];
@@ -234,7 +234,7 @@ let entries=[];
 let cfg=ls.get("cfg",{url:"",key:""});
 const GMODE=()=>cfg.mode==="google";
 let PLAN=ls.get("plan",null)||defaultPlan();
-(function(){const add=[["Uginanie – linka","Uginanie bayesowskie – brama (oburącz)"],["Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"],["Uginanie nóg siedząc (maszyna)","RDL – hantle"],["Uginanie nóg siedząc (maszyna)","Wyprosty na ławce rzymskiej"],...NOGI_ALT.map(n=>["Uginanie nóg siedząc (maszyna)",n]),["Wyciskanie hantli – skos","Wyciskanie na maszynie – talerze (na rękę)"],["Wiosłowanie linką (dół)","Wiosłowanie na maszynie z oparciem – talerze (na rękę)"],["Przysiad ze sztangą","Przysiad na maszynie – talerze"],["Wyciskanie hantli – skos","Wyciskanie na maszynie – skos"]];let ch=false;
+(function(){const add=[["Uginanie – linka","Uginanie bayesowskie – brama (oburącz)"],["Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"],["Uginanie nóg siedząc (maszyna)","RDL – hantle"],["Uginanie nóg siedząc (maszyna)","Wyprosty na ławce rzymskiej"],...NOGI_ALT.map(n=>["Uginanie nóg siedząc (maszyna)",n]),["Wyciskanie hantli – skos","Wyciskanie na maszynie – talerze (na rękę)"],["Wiosłowanie linką (dół)","Wiosłowanie na maszynie z oparciem – talerze (na rękę)"],["Przysiad ze sztangą","Przysiad na maszynie – talerze"],["Wyciskanie hantli – skos","Wyciskanie na maszynie – skos"],["Ściąganie drążka / linki","Ściąganie – maszyna rozbieżna (Precor)"]];let ch=false;
   for(const se of PLAN.sessions||[])for(const sl of se.slots||[])for(const e of sl.ex||[])for(const [k,n] of add)if(e.opts&&e.opts.includes(k)&&!e.opts.includes(n)){e.opts.push(n);ch=true}
   if(ch&&ls.get("plan",null))ls.set("plan",PLAN)})();
 (function(){const m=location.hash.match(/k=([A-Za-z0-9_-]+)/);if(m){cfg.key=m[1];ls.set("cfg",cfg);history.replaceState(null,"",location.pathname)}})();
@@ -354,7 +354,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list)).then(()=>oneTimeFix9(list)).then(()=>oneTimeFix10(list)).then(()=>oneTimeFix11(list)).then(()=>oneTimeFix12(list)).then(()=>load2Fix13());
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list)).then(()=>oneTimeFix9(list)).then(()=>oneTimeFix10(list)).then(()=>oneTimeFix11(list)).then(()=>oneTimeFix12(list)).then(()=>load2Fix13()).then(()=>oneTimeFix14(list));
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -463,6 +463,13 @@ async function load2Fix13(){
   const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+stripGym(e.note);
   for(const it of fixed.items)if(it.key==="biceps"||it.key==="triceps"){it.sets=it.sets.concat([10]);if(it.ws&&it.ws.length)it.ws=it.ws.concat([it.w])}
   ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Dopisałem 3. serie bicepsa i tricepsa z 21.11")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
+}
+async function oneTimeFix14(list){
+  const FIX="fix-24-11-sciaganie"; if(ls.get(FIX,false)) return;
+  const e=list.find(x=>x.id==="smwuyhwa1ima9"); if(!e||!e.items.some(i=>i.ex==="Ściąganie na maszynie")){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+stripGym(e.note);
+  for(const it of fixed.items)if(it.ex==="Ściąganie na maszynie")it.ex="Ściąganie – maszyna rozbieżna (Precor)";
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem nazwę ściągania z 24.11")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
