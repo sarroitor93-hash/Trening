@@ -357,7 +357,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list)).then(()=>oneTimeFix9(list)).then(()=>oneTimeFix10(list)).then(()=>oneTimeFix11(list)).then(()=>oneTimeFix12(list)).then(()=>load2Fix13()).then(()=>oneTimeFix14(list)).then(()=>oneTimeFix15()).then(()=>oneTimeFix16()).then(()=>oneTimeFix17());
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list)).then(()=>oneTimeFix9(list)).then(()=>oneTimeFix10(list)).then(()=>oneTimeFix11(list)).then(()=>oneTimeFix12(list)).then(()=>load2Fix13()).then(()=>oneTimeFix14(list)).then(()=>oneTimeFix15()).then(()=>oneTimeFix16()).then(()=>oneTimeFix17()).then(()=>oneTimeFix18());
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -506,8 +506,18 @@ async function oneTimeFix17(){
   if(!e){return}
   const sq=e.items.find(i=>i.key==="silaB"); if(!sq||(sq.ws&&sq.ws.length>1&&sq.ws[1]===90)){ls.set(FIX,true);return}
   const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+stripGym(e.note);
-  for(const it of fixed.items){if(it.key==="silaB"){it.ws=[95,90,90,90];it.w=95}if(it.key==="triceps"&&!it.note)it.note="inna maszyna niż zwykle"}
+  for(const it of fixed.items){if(it.key==="silaB"){it.ws=[95,90,90,90];it.w=95}}
   ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id); toast("Poprawiłem przysiad z 25.11: 95/90/90/90 kg")}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
+}
+async function oneTimeFix18(){
+  const FIX="fix-25-11-triceps-brama"; if(ls.get(FIX,false)) return;
+  if(queue().length)return;
+  const e=ls.get("cache",[]).find(x=>x.kind==="sila"&&x.type==="B"&&String(x.date).slice(0,10)==="2026-11-25");
+  if(!e)return;
+  if(!e.items.some(i=>i.note==="inna maszyna niż zwykle")){ls.set(FIX,true);return}
+  const fixed=JSON.parse(JSON.stringify(e)); delete fixed.id; if(e.gym)fixed.note="@"+e.gym+" | "+stripGym(e.note);
+  for(const it of fixed.items)if(it.note==="inna maszyna niż zwykle")it.note="";
+  ls.set(FIX,true); try{await addEntry(fixed); await removeEntry(e.id)}catch(err){if(!(err&&err.queued))ls.set(FIX,false)}
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
