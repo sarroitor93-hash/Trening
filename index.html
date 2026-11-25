@@ -44,6 +44,7 @@ h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.02e
 .tabs button{border:0;background:transparent;border-radius:7px;padding:8px 0;font-family:var(--display);font-weight:600;font-size:16px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 main{display:grid;gap:12px;padding-top:6px}
+.arr .mini{white-space:nowrap}
 .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .seg{display:inline-flex;flex-wrap:wrap;background:var(--surface-2);border-radius:var(--r);padding:3px;gap:3px}
 .seg button{white-space:nowrap;border:0;background:transparent;border-radius:7px;min-width:44px;padding:6px 10px;font-family:var(--display);font-weight:700;font-size:20px;color:var(--muted)}
@@ -523,6 +524,9 @@ async function removeEntry(id){
   setEntries(entries.filter(x=>x.id!==id)); syncLabel();
 }
 window.addEventListener("online",()=>{flush().then(load)});
+// Przytrzymanie nagłówka bloku = tryb kolejności
+{let hold=null,sx=0,sy=0;document.addEventListener("pointerdown",e=>{const h=e.target.closest&&e.target.closest("[data-hold]");if(!h||!draft||draft.type==="Dom")return;sx=e.clientX;sy=e.clientY;clearTimeout(hold);hold=setTimeout(()=>{hold=null;draft.arrange=true;saveDraft();vib(60);render();window.scrollTo({top:0,behavior:"smooth"})},600)});
+ const cancel=()=>{clearTimeout(hold);hold=null};document.addEventListener("pointerup",cancel);document.addEventListener("pointercancel",cancel);document.addEventListener("pointermove",e=>{if(hold&&(Math.abs(e.clientX-sx)>10||Math.abs(e.clientY-sy)>10))cancel()})}
 window.addEventListener("offline",syncLabel);
 
 // ---------- Derived from history ----------
@@ -564,9 +568,27 @@ function draftHasSets(){return draft&&(Object.values(draft.items).some(i=>!i.ski
 function setsFor(ex){return draft.minimum?Math.min(2,ex.sets):ex.sets}
 const XEX={step:2.5,unit:"kg",lo:8,hi:12,sets:3,noProg:true};
 function repUnit(name){return /sek\./.test(name)?"sek.":/rundy/.test(name)?"rundy":"powt."}
-function incomplete(){if(!draft||draft.type==="Dom")return [];const out=[];for(const s of plan(draft.type)){if(draft.minimum&&!s.min)continue;for(const ex of s.ex){const it=draft.items[ex.key];if(!it||it.skip)continue;const n=setsFor(ex)+(it.plus||0),done=it.sets.slice(0,n).filter(x=>x!=null).length;if(done>0&&done<n)out.push({key:ex.key,ex:it.ex,done,n})}}return out}
+// ---------- Układ treningu (kolejność / superserie) — per trening ----------
+function origSlot(key){for(const sl of plan(draft.type))if(sl.ex.some(e=>e.key===key))return sl;return null}
+function baseGroups(){return plan(draft.type).map(sl=>sl.ex.map(e=>e.key))}
+function curGroups(){if(!draft.groups)return baseGroups();const all=plan(draft.type).flatMap(sl=>sl.ex.map(e=>e.key)),seen=new Set();
+  const g=draft.groups.map(gr=>gr.filter(k=>all.includes(k)&&!seen.has(k)&&seen.add(k))).filter(gr=>gr.length);
+  for(const k of all)if(!seen.has(k))g.push([k]);return g}
+function layout(){if(!draft||draft.type==="Dom"||!draft.groups)return plan(draft.type);
+  return curGroups().map((gr,i)=>{const sls=gr.map(origSlot),exs=gr.map(k=>findEx(k)).filter(Boolean),id="g:"+gr.join("+");
+    const same=sls.every(x=>x===sls[0])&&sls[0]&&sls[0].ex.length===gr.length;
+    const n0=/^0\b/.test(plan(draft.type)[0].title)?0:1,num=i+n0;
+    if(same)return Object.assign({},sls[0],{title:String(sls[0].title).replace(/^\d+\s*·\s*/,num+" · ")});
+    return {id,title:num+" · "+exs.map(e=>e.label.split(" · ")[0]).join(" + "),rule:gr.length>1?"superseria · Twój układ":"Twój układ",
+      rest:Math.max(...sls.map(x=>x?(restCfg[x.id]!=null?restCfg[x.id]:(x.rest||90)):90)),min:sls.some(x=>x&&x.min),nofail:sls.some(x=>x&&x.nofail),ex:exs}})}
+function renderArrange(){const G=curGroups();let h=`<section class="card"><h2>Kolejność i superserie</h2><p class="hint">Ustaw tak, jak naprawdę robisz dziś. Strzałki przesuwają grupę, „Połącz” dokleja ćwiczenie do grupy wyżej, „Odłącz” robi z niego osobny blok. Zmiana dotyczy tylko tego treningu.</p>`;
+  const n0=/^0\b/.test(plan(draft.type)[0].title)?0:1;G.forEach((gr,gi)=>{h+=`<div class="ex arr" style="gap:6px"><div class="ex-top"><b>${gi+n0}${gr.length>1?" · superseria":""}</b><span class="tools"><button class="mini" data-gup="${gi}" ${gi?"":"disabled"} aria-label="Grupa wyżej">↑</button><button class="mini" data-gdn="${gi}" ${gi<G.length-1?"":"disabled"} aria-label="Grupa niżej">↓</button></span></div>`;
+    gr.forEach((k,mi)=>{const ex=findEx(k),it=draft.items[k];h+=`<div class="ex-top"><span>${esc(ex?ex.label.split(" · ")[0]:k)}${it&&it.ex?" · <span class='hint'>"+esc(it.ex)+"</span>":""}${it&&it.skip?" <span class='hint'>(pominięte)</span>":""}</span><span class="tools">${gr.length>1?`<button class="mini" data-msplit="${gi}:${mi}">Odłącz</button>`:""}${gi>0?`<button class="mini" data-mjoin="${gi}:${mi}">Połącz ↑</button>`:""}</span></div>`});
+    h+=`</div>`});
+  return h+`<div class="two"><button class="ghost" id="arr-reset">Układ z planu</button><button class="primary" id="arr-done">Gotowe</button></div></section>`}
+function incomplete(){if(!draft||draft.type==="Dom")return [];const out=[];for(const s of layout()){if(draft.minimum&&!s.min)continue;for(const ex of s.ex){const it=draft.items[ex.key];if(!it||it.skip)continue;const n=setsFor(ex)+(it.plus||0),done=it.sets.slice(0,n).filter(x=>x!=null).length;if(done>0&&done<n)out.push({key:ex.key,ex:it.ex,done,n})}}return out}
 function fillMissing(){for(const m of incomplete()){const it=draft.items[m.key],n=m.n;let lastR=null,lastW=it.w;for(let i=0;i<n;i++){if(it.sets[i]!=null){lastR=it.sets[i];if(it.ws&&it.ws[i]!=null)lastW=it.ws[i]}else if(lastR!=null){it.sets[i]=lastR;it.ws=it.ws||[];it.ws[i]=lastW}}}}
-function allItems(){const out=[];for(const s of plan(draft.type))for(const ex of s.ex){const it=draft.items[ex.key];if(it&&!it.skip)out.push([ex.key,it])}for(const x of (draft.extras||[]))if(x.ex)out.push(["extra",x]);return out}
+function allItems(){const out=[];for(const s of layout())for(const ex of s.ex){const it=draft.items[ex.key];if(it&&!it.skip)out.push([ex.key,it])}for(const x of (draft.extras||[]))if(x.ex)out.push(["extra",x]);return out}
 
 // ---------- Prefs: sound & vibration ----------
 let prefs=Object.assign({snd:"cicho",vib:true,notif:false},ls.get("prefs",{}));
@@ -577,16 +599,16 @@ function nRest(end,title,next){if(NATIVE.restStartLevel)NATIVE.restStartLevel(en
 function vib(pat){try{if(!prefs.vib)return;if(NATIVE){NATIVE.vibrate(Array.isArray(pat)?pat[0]:pat);return}if(navigator.vibrate)navigator.vibrate(pat)}catch(e){}}
 // ---------- Status notification (pasek powiadomień) ----------
 const canNotif=()=>!NATIVE&&prefs.notif&&"Notification" in window&&Notification.permission==="granted"&&"serviceWorker" in navigator;
-function nextUp(){if(!draft||draft.type==="Dom")return null;for(const s of plan(draft.type)){if(draft.minimum&&!s.min)continue;for(const ex of s.ex){const it=draft.items[ex.key];if(!it||it.skip)continue;const n=setsFor(ex)+(it.plus||0),done=it.sets.slice(0,n).filter(x=>x!=null).length;if(done<n)return `${it.ex} · seria ${done+1}/${n}${ex.unit==="kg"&&it.w?" · "+fmt(it.w)+" kg":""}`}}return null}
+function nextUp(){if(!draft||draft.type==="Dom")return null;for(const s of layout()){if(draft.minimum&&!s.min)continue;for(const ex of s.ex){const it=draft.items[ex.key];if(!it||it.skip)continue;const n=setsFor(ex)+(it.plus||0),done=it.sets.slice(0,n).filter(x=>x!=null).length;if(done<n)return `${it.ex} · seria ${done+1}/${n}${ex.unit==="kg"&&it.w?" · "+fmt(it.w)+" kg":""}`}}return null}
 function hhmmss(t){return new Date(t).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
 function statusNotif(title,body,alert){if(!canNotif())return;navigator.serviceWorker.ready.then(r=>r.showNotification(title,{body,tag:"trening",renotify:!!alert,silent:!alert,vibrate:alert&&prefs.vib?[300,120,300,120,300]:undefined,icon:"icon-192.png",badge:"icon-192.png"})).catch(()=>{})}
 function clearNotif(){if(NATIVE){try{NATIVE.clear()}catch(e){}return}if(!("serviceWorker" in navigator))return;navigator.serviceWorker.ready.then(r=>r.getNotifications({tag:"trening"})).then(ns=>ns.forEach(n=>n.close())).catch(()=>{})}
 function notifIdle(){const nx=nextUp();if(NATIVE&&draft&&draft.start&&draftHasSets()){try{NATIVE.status("Trening w toku",nx?"Następne: "+nx:"Wszystko odhaczone · zapisz trening")}catch(e){}return}if(draft&&draft.start&&draftHasSets())statusNotif("Trening w toku",nx?"Następne: "+nx:"Wszystko odhaczone · zapisz trening",false)}
 // ---------- Rest timer (countdown) ----------
 let restCfg=ls.get("rest-cfg",{}),restAt=null,restDur=0,restTick=null,restBeeped=false;
-const restFor=sl=>restCfg[sl.id]!=null?restCfg[sl.id]:(sl.rest||90);
+const restFor=sl=>sl?(restCfg[sl.id]!=null?restCfg[sl.id]:(sl.rest||90)):90;
 function roundDone(sl,i){if(!sl)return true;return sl.ex.every(ex=>{const it=draft.items[ex.key];if(!it||it.skip)return true;const n=setsFor(ex)+(it.plus||0);return i>=n||it.sets[i]!=null})}
-function slotOf(key){if(!draft||key[0]==="x")return null;for(const sl of plan(draft.type))if(sl.ex.some(e=>e.key===key))return sl;return null}
+function slotOf(key){if(!draft||key[0]==="x")return null;for(const sl of layout())if(sl.ex.some(e=>e.key===key))return sl;return null}
 function startRest(sec){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
   restAt=Date.now();restDur=sec||90;restBeeped=false;drawRest.over=null;$("#rest").hidden=false;{const nx=nextUp();if(NATIVE){try{nRest(restAt+restDur*1000,"Przerwa",nx?"Następne: "+nx:"Ostatnia seria za Tobą")}catch(e){}}else statusNotif("Przerwa do "+hhmmss(restAt+restDur*1000),(nx?"Następne: "+nx:"Ostatnia seria za Tobą")+" · "+mmssR(restDur),false)}if(!restTick)restTick=setInterval(drawRest,250);drawRest()}
 function stopRest(){const was=!!restAt;restAt=null;if(was&&NATIVE){try{NATIVE.restStop()}catch(e){}}if(was)setTimeout(notifIdle,50);$("#rest").hidden=true;clearInterval(restTick);restTick=null;$("#rest").classList.remove("over")}
@@ -646,16 +668,17 @@ function renderSila(){
   const P=plan(draft.type), dom=draft.type==="Dom", c=draft.type==="C";
   let h=`<div class="bar"><div class="seg" role="group" aria-label="Sesja">
     ${[...sessionIds(),"Dom"].map(t=>`<button data-type="${esc(t)}" aria-pressed="${draft.type===t}">${esc(t==="Dom"?"Dom":sessionName(t))}</button>`).join("")}</div>
-    ${dom?"":`<button class="tog" id="minimum" aria-pressed="${draft.minimum}">Tryb minimum</button>`}</div>
+    ${dom?"":`<span class="tools"><button class="tog" id="arrange" aria-pressed="${!!draft.arrange}">⇅ Kolejność</button><button class="tog" id="minimum" aria-pressed="${draft.minimum}">Tryb minimum</button></span>`}</div>
     <p class="hint">${dom?"Kettle 20 kg w domu. Zastępuje sesję siłowni, nie zastępuje biegu. Kolejka sesji idzie dalej.":draft.minimum?"Tryb minimum: tylko siła i góra, po 2 serie. Lepsze niż zero.":"Następna w kolejce: <b>"+esc(sessionName(nextType()))+"</b>. Kolejka: "+sessionIds().map(sessionName).map(esc).join(" → ")+", niezależnie od dnia. "+esc(PLAN.note||"")}</p>`;
   if(!dom){const G=gyms();if(DEFAULT_GYM&&(draft.gym===undefined||draft.gym==="")){draft.gym=DEFAULT_GYM;regym();saveDraft()}
     h+=`<div class="chips">${G.map(g=>`<button class="chip" data-gym="${esc(g)}" aria-pressed="${draft.gym===g}">${esc(g)}</button>`).join("")}<button class="chip" id="gym-add">+ Siłownia</button></div>${draft.gymNew?`<div class="row"><input class="name" id="gym-new" placeholder="Nazwa siłowni, np. Zdrofit Pruszków"><button class="ghost" id="gym-ok">Dodaj</button></div>`:""}`}
   if(draft.editId) h+=`<p class="hint" style="color:var(--warn);font-weight:600">Edycja treningu z ${new Date(draft.editDate).toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})}. Nowe serie: ustaw powtórzenia i dotknij kwadratu.</p>`;
   if(draft.start&&draftHasSets()&&!draft.editId) h+=`<p class="hint num">Trening trwa: <b>${mmssR((Date.now()-draft.start)/1000)}</b> (od pierwszej serii)</p>`;
   if(dom) h+=renderTimerCard();
-  for(const s of P){
+  if(!dom&&draft.arrange) h+=renderArrange();
+  for(const s of (dom?P:layout())){
     if(draft.minimum&&!dom&&!s.min) continue;
-    h+=`<section class="slot"><div class="slot-h"><h2>${s.title}</h2><span class="rule ${s.nofail?"nofail":""}">${s.rule}</span></div>${dom?"":`<div class="restctl">Przerwa <button class="mini" data-rdec="${s.id}" aria-label="Krócej">−</button><b class="num">${mmssR(restFor(s))}</b><button class="mini" data-rinc="${s.id}" aria-label="Dłużej">+</button><button class="mini" data-rgo="${s.id}">▶ Start</button></div>`}`;
+    h+=`<section class="slot"><div class="slot-h" data-hold="1"><h2>${s.title}</h2><span class="rule ${s.nofail?"nofail":""}">${s.rule}</span></div>${dom?"":`<div class="restctl">Przerwa <button class="mini" data-rdec="${s.id}" aria-label="Krócej">−</button><b class="num">${mmssR(restFor(s))}</b><button class="mini" data-rinc="${s.id}" aria-label="Dłużej">+</button><button class="mini" data-rgo="${s.id}">▶ Start</button></div>`}`;
     for(const ex of s.ex){const it=draft.items[ex.key]; if(!it) continue; const n=(dom?ex.sets:setsFor(ex))+(it.plus||0); h+=exBlock(ex,it,ex.key,n,dom,false)}
     h+=`</section>`;
   }
@@ -1023,8 +1046,8 @@ function bump(id,dir){
 document.addEventListener("click",async ev=>{
   const b=ev.target.closest("button"); if(!b) return;
   if(timerClick(b)) return;
-  if(b.dataset.rdec||b.dataset.rinc){const id=b.dataset.rdec||b.dataset.rinc,sl=plan(draft.type).find(x=>x.id===id);restCfg[id]=Math.max(15,restFor(sl)+(b.dataset.rinc?15:-15));ls.set("rest-cfg",restCfg);render();return}
-  if(b.dataset.rgo){const sl=plan(draft.type).find(x=>x.id===b.dataset.rgo);startRest(restFor(sl));return}
+  if(b.dataset.rdec||b.dataset.rinc){const id=b.dataset.rdec||b.dataset.rinc,sl=layout().find(x=>x.id===id);restCfg[id]=Math.max(15,restFor(sl)+(b.dataset.rinc?15:-15));ls.set("rest-cfg",restCfg);render();return}
+  if(b.dataset.rgo){const sl=layout().find(x=>x.id===b.dataset.rgo);startRest(restFor(sl));return}
   if(b.id==="open-setup"){tab="setup";render();return}
   if(b.id==="open-plan"){PE=null;tab="planed";render();window.scrollTo(0,0);return}
   if(b.dataset.pe){peClick(b);return}
@@ -1047,6 +1070,11 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.dec) return bump(b.dataset.dec,-1);
   if(b.dataset.type){ if(b.dataset.type!==draft.type){ if(draftHasSets()&&!b.dataset.ok){ toast("Masz niezapisane serie. Zapisz albo wyczyść trening."); return } draft=newDraft(b.dataset.type,draft.minimum); saveDraft(); render() } return }
   if(b.id==="minimum"){draft.minimum=!draft.minimum;saveDraft();render();return}
+  if(b.id==="arrange"||b.id==="arr-done"){draft.arrange=b.id==="arrange"?!draft.arrange:false;saveDraft();render();if(draft.arrange)window.scrollTo({top:0,behavior:"smooth"});return}
+  if(b.id==="arr-reset"){draft.groups=null;saveDraft();render();return}
+  if(b.dataset.gup||b.dataset.gdn){const G=curGroups(),i=+(b.dataset.gup||b.dataset.gdn),j=b.dataset.gup?i-1:i+1;if(j<0||j>=G.length)return;[G[i],G[j]]=[G[j],G[i]];draft.groups=G;saveDraft();render();return}
+  if(b.dataset.msplit){const G=curGroups(),[gi,mi]=b.dataset.msplit.split(":").map(Number),g=G[gi];G.splice(gi,1,...[g.slice(0,mi),[g[mi]],g.slice(mi+1)].filter(x=>x.length));draft.groups=G;saveDraft();render();return}
+  if(b.dataset.mjoin){const G=curGroups(),[gi,mi]=b.dataset.mjoin.split(":").map(Number),k=G[gi].splice(mi,1)[0];G[gi-1].push(k);draft.groups=G.filter(g=>g.length);saveDraft();render();return}
   if(b.dataset.ex){const key=b.dataset.ex,ex=findEx(key),old=draft.items[key],fresh=freshItem(ex,b.dataset.name);fresh.sets=old.sets;fresh.plus=old.plus;draft.items[key]=fresh;saveDraft();render();return}
   if(b.dataset.skip){const k=b.dataset.skip; if(k[0]==="x")draft.extras.splice(+k.slice(1),1); else draft.items[k].skip=true; saveDraft(); render(); return}
   if(b.dataset.unskip){draft.items[b.dataset.unskip].skip=false; saveDraft(); render(); return}
