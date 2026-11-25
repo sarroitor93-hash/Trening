@@ -186,7 +186,7 @@ const LYDKI=["Wznosy na łydki stojąc","Wznosy na łydki siedząc","Wznosy na �
 const BOKI=["Odwodzenie linką","Odwodzenie hantlami","Odwodzenie na maszynie","Wyciskanie nad głowę – hantle","Wyciskanie nad głowę – maszyna"];
 const ABS=["Brzuszki na maszynie","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)","Spięcia na linie"];
 const BIC=["Uginanie – hantle","Uginanie – sztanga","Uginanie – linka","Uginanie bayesowskie – podwójny wyciąg (oburącz)","Uginanie – linka – podwójny wyciąg"];
-const TRI=["Prostowanie linką w dół","Prostowanie linką nad głową","Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg","Prostowanie linką w dół – podwójny wyciąg","Prostowanie linką nad głową – podwójny wyciąg"];
+const TRI=["Prostowanie linką w dół","Prostowanie linką nad głową","Prostowanie jednorącz","Prostowanie jednorącz nad głową – podwójny wyciąg","Prostowanie linką w dół – podwójny wyciąg","Prostowanie linką nad głową – podwójny wyciąg"];
 const BW=["Podciąganie","Pompki","Pompki – nogi wyżej","Unoszenie nóg w zwisie","Unoszenie kolan na poręczach","Kółko (ab wheel)","Deska (sek.)","Tabata brzuch (rundy)"];
 const ALL=[...new Set(["Rozpiętki (maszyna)","Martwy ciąg","RDL","Przysiad hack","Suwnica","Przysiad ze sztangą",...KLATKA,...PLECY,...NOGI,...BOKI,...BIC,...TRI,...ABS,"Wznosy na łydki","Odwrotne rozpiętki","Face pull","Hip thrust","Wykroki","Dipy"])];
 function arms(){return {id:"ramiona",rest:90,title:"4 · Biceps + triceps",rule:"superseria · do upadku",min:false,
@@ -234,7 +234,8 @@ let entries=[];
 let cfg=ls.get("cfg",{url:"",key:""});
 const GMODE=()=>cfg.mode==="google";
 let PLAN=ls.get("plan",null)||defaultPlan();
-(function(){for(const se of PLAN.sessions||[])for(const sl of se.slots||[])for(const e of sl.ex||[])if(e.opts){const i=e.opts.indexOf("Uginanie bayesowskie – brama (oburącz)");if(i>=0){if(e.opts.includes("Uginanie bayesowskie – podwójny wyciąg (oburącz)"))e.opts.splice(i,1);else e.opts[i]="Uginanie bayesowskie – podwójny wyciąg (oburącz)";if(ls.get("plan",null))ls.set("plan",PLAN)}}
+(function(){for(const se of PLAN.sessions||[])for(const sl of se.slots||[])for(const e of sl.ex||[])if(e.opts){const i=e.opts.indexOf("Prostowanie jednorącz nad głową – wyciąg");if(i>=0){if(e.opts.includes("Prostowanie jednorącz nad głową – podwójny wyciąg"))e.opts.splice(i,1);else e.opts[i]="Prostowanie jednorącz nad głową – podwójny wyciąg";if(ls.get("plan",null))ls.set("plan",PLAN)}}
+  for(const se of PLAN.sessions||[])for(const sl of se.slots||[])for(const e of sl.ex||[])if(e.opts){const i=e.opts.indexOf("Uginanie bayesowskie – brama (oburącz)");if(i>=0){if(e.opts.includes("Uginanie bayesowskie – podwójny wyciąg (oburącz)"))e.opts.splice(i,1);else e.opts[i]="Uginanie bayesowskie – podwójny wyciąg (oburącz)";if(ls.get("plan",null))ls.set("plan",PLAN)}}
   const add=[["Uginanie – linka","Uginanie bayesowskie – podwójny wyciąg (oburącz)"],["Uginanie – linka","Uginanie – linka – podwójny wyciąg"],["Prostowanie linką w dół","Prostowanie linką w dół – podwójny wyciąg"],["Prostowanie linką w dół","Prostowanie linką nad głową – podwójny wyciąg"],["Prostowanie jednorącz","Prostowanie jednorącz nad głową – wyciąg"],["Uginanie nóg siedząc (maszyna)","RDL – hantle"],["Uginanie nóg siedząc (maszyna)","Wyprosty na ławce rzymskiej"],...NOGI_ALT.map(n=>["Uginanie nóg siedząc (maszyna)",n]),["Wyciskanie hantli – skos","Wyciskanie na maszynie – talerze (na rękę)"],["Wiosłowanie linką (dół)","Wiosłowanie na maszynie z oparciem – talerze (na rękę)"],["Przysiad ze sztangą","Przysiad na maszynie – talerze"],["Wyciskanie hantli – skos","Wyciskanie na maszynie – skos"],["Ściąganie drążka / linki","Ściąganie – maszyna rozbieżna (Precor)"]];let ch=false;
   for(const se of PLAN.sessions||[])for(const sl of se.slots||[])for(const e of sl.ex||[])for(const [k,n] of add)if(e.opts&&e.opts.includes(k)&&!e.opts.includes(n)){e.opts.push(n);ch=true}
   if(ch&&ls.get("plan",null))ls.set("plan",PLAN)})();
@@ -355,7 +356,7 @@ async function load(){
     if(GMODE()){data=await gData();const rp=await gLoadPlan();if(rp&&rp.sessions&&JSON.stringify(rp)!==JSON.stringify(PLAN)&&(!PLAN.updated||rp.updated>=PLAN.updated)){PLAN=rp;ls.set("plan",PLAN)}}
     else{const r=await fetch(cfg.url+"?action=data&key="+encodeURIComponent(cfg.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error); data=j.data}
     const list=build(data); ls.set("cache",list); setEntries(withQueue(list)); syncLabel();
-    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list)).then(()=>oneTimeFix9(list)).then(()=>oneTimeFix10(list)).then(()=>oneTimeFix11(list)).then(()=>oneTimeFix12(list)).then(()=>load2Fix13()).then(()=>oneTimeFix14(list)).then(()=>oneTimeFix15());
+    if(!GMODE()) oneTimeFixes(list).then(()=>oneTimeFix2(list)).then(()=>oneTimeAdd3(list)).then(()=>oneTimeFix4(list)).then(()=>oneTimeRestore5(list)).then(()=>oneTimeFix6(list)).then(()=>oneTimeFix7(list)).then(()=>oneTimeFix8(list)).then(()=>oneTimeFix9(list)).then(()=>oneTimeFix10(list)).then(()=>oneTimeFix11(list)).then(()=>oneTimeFix12(list)).then(()=>load2Fix13()).then(()=>oneTimeFix14(list)).then(()=>oneTimeFix15()).then(()=>oneTimeFix16());
   }catch(e){ if(e&&e.auth){needLogin=true;syncLabel();return} setSync(navigator.onLine?"Brak połączenia z arkuszem · odśwież":"Offline · dane z pamięci telefonu",true) }
 }
 // Jednorazowe poprawki danych zleconą przez Igora (wykonują się raz, potem flaga w telefonie)
@@ -486,6 +487,16 @@ async function oneTimeFix15(){
   for(const e of todo){const fixed=rules(e);delete fixed.id;if(e.gym)fixed.note="@"+e.gym+" | "+stripGym(e.note);
     try{await addEntry(fixed);await removeEntry(e.id);n++}catch(err){if(!(err&&err.queued)){ls.set(FIX,false);break}}}
   if(n)toast("Oznaczyłem ćwiczenia na podwójnym wyciągu ("+n+" tren.)")
+}
+async function oneTimeFix16(){
+  const FIX="fix-podwojny-wyciag-2"; if(ls.get(FIX,false)) return;
+  if(queue().length)return;
+  const todo=ls.get("cache",[]).filter(e=>e.kind==="sila"&&(e.items||[]).some(i=>i.ex==="Prostowanie jednorącz nad głową – wyciąg"));
+  ls.set(FIX,true); let n=0;
+  for(const e of todo){const fixed=JSON.parse(JSON.stringify(e));delete fixed.id;if(e.gym)fixed.note="@"+e.gym+" | "+stripGym(e.note);
+    for(const it of fixed.items)if(it.ex==="Prostowanie jednorącz nad głową – wyciąg")it.ex="Prostowanie jednorącz nad głową – podwójny wyciąg";
+    try{await addEntry(fixed);await removeEntry(e.id);n++}catch(err){if(!(err&&err.queued)){ls.set(FIX,false);break}}}
+  if(n)toast("Oznaczyłem prostowanie jednorącz na podwójnym wyciągu ("+n+" tren.)")
 }
 async function oneTimeFix2(list){
   const FIX="fix-22-10-suwnica-barki"; if(ls.get(FIX,false)) return;
