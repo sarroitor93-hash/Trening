@@ -694,7 +694,7 @@ function renderSila(){
     h+=`<div class="chips">${G.map(g=>`<button class="chip" data-gym="${esc(g)}" aria-pressed="${draft.gym===g}">${esc(g)}</button>`).join("")}<button class="chip" id="gym-add">+ Siłownia</button></div>${draft.gymNew?`<div class="row"><input class="name" id="gym-new" placeholder="Nazwa siłowni, np. Zdrofit Pruszków"><button class="ghost" id="gym-ok">Dodaj</button></div>`:""}`}
   if(draft.editId) h+=`<p class="hint" style="color:var(--warn);font-weight:600">Edycja treningu z ${new Date(draft.editDate).toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})}. Nowe serie: ustaw powtórzenia i dotknij kwadratu.</p>`;
   if(draft.start&&draftHasSets()&&!draft.editId) h+=`<p class="hint num">Trening trwa: <b>${mmssR((Date.now()-draft.start)/1000)}</b> (od pierwszej serii)</p>`;
-  if(dom) h+=renderTimerCard();
+  if(dom) h+=renderPresetCard()+renderTimerCard();
   if(!dom&&draft.arrange) h+=renderArrange();
   for(const s of (dom?P:layout())){
     if(draft.minimum&&!dom&&!s.min) continue;
@@ -943,6 +943,8 @@ const HOME=[
  {id:"goblet",g:"k",name:"Goblet squat",reps:"15 powt.",n:15},
  {id:"fsq",g:"k",name:"Przysiad z kettlem w racku L+P",reps:"8 / stronę",n:8},
  {id:"thruster",g:"k",name:"Thruster L+P",reps:"6 / stronę",n:6},
+ {id:"thruster5",g:"k",name:"Thruster L+P",reps:"5 / stronę",n:5},
+ {id:"swing15",g:"k",name:"Swingi",reps:"15 powt.",key:"swing",n:15},
  {id:"bulgL",g:"k",name:"Bułgarskie – lewa",reps:"8–10 powt.",key:"bulg",n:10},
  {id:"bulgP",g:"k",name:"Bułgarskie – prawa",reps:"8–10 powt.",key:"bulg",n:10},
  {id:"lunge",g:"k",name:"Wykroki z kettlem L+P",reps:"8 / stronę",n:8},
@@ -966,6 +968,7 @@ const HB0=Object.fromEntries(HOME.map(h=>[h.id,h]));
 const HB=new Proxy(HB0,{get:(o,id)=>o[id]||(typeof id==="string"&&id.startsWith("c:")?{id,g:"c",name:id.slice(2),reps:"",n:10}:{id,name:String(id),reps:""})});
 const TMODES={emom:{label:"EMOM",work:60,rest:0,rounds:4},tabata:{label:"Tabata",work:20,rest:10,rounds:8},int:{label:"Praca / przerwa",work:40,rest:20,rounds:4}};
 const tdef=()=>({mode:"emom",work:60,rest:0,rounds:4,list:["swing","bulgL","bulgP","row","ohp","push"]});
+const TPRESETS=[{id:"int20",label:"Interwał 20 min",sub:"swingi · burpees · thrustery · pompki × 5 rund",cfg:{mode:"emom",work:60,rest:0,rounds:5,list:["swing15","burpee","thruster5","push"]}}];
 let tc=ls.get("timer-cfg",null)||tdef();
 const saveTc=()=>ls.set("timer-cfg",tc);
 const mmss=sec=>{sec=Math.max(0,Math.ceil(sec));return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0")};
@@ -982,6 +985,7 @@ function renderTimerCard(){
    <div class="row"><input class="name" id="t-custom" placeholder="Własne ćwiczenie, np. Double clean"><button class="ghost" id="t-addc">Dodaj</button></div>
    <p class="hint num">Runda = ${tc.list.length} × ${tc.work} s${tc.rest?` + przerwy ${tc.rest} s`:""}. Razem ok. <b>${mmss(total)}</b> min.</p>
    <div class="two"><button class="ghost" id="t-preset">Mój EMOM 24 min</button><button class="primary" id="t-start" ${tc.list.length?"":"disabled"}>▶ Start</button></div></section>`}
+function renderPresetCard(){return `<section class="card"><h2>Gotowe treningi</h2>${TPRESETS.map(p=>`<button class="primary" data-tpre="${p.id}" style="width:100%;text-align:left">▶ ${esc(p.label)}<br><small style="font-weight:400">${esc(p.sub)}</small></button>`).join("")}<p class="hint">Jedno dotknięcie: ustawia stoper i startuje (10 s na przygotowanie).</p></section>`}
 let T=null,actx=null,wake=null;
 function beep(f,ms){try{if(!actx||prefs.snd==="off")return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;if(prefs.snd==="glosno")o.type="square";o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(prefs.snd==="glosno"?.45:prefs.snd==="sredni"?.25:.04,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(e){}}
 async function lockScreen(){if(NATIVE){try{NATIVE.keepScreenOn(true)}catch(e){}}try{if("wakeLock" in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
@@ -1041,6 +1045,7 @@ function timerClick(b){
   if(b.dataset.tup){const i=+b.dataset.tup;[tc.list[i-1],tc.list[i]]=[tc.list[i],tc.list[i-1]];saveTc();render();return true}
   if(b.id==="t-addc"){const v=($("#t-custom").value||"").trim();if(v){tc.list.push("c:"+v);saveTc();render()}return true}
   if(b.id==="t-preset"){tc=tdef();saveTc();render();return true}
+  if(b.dataset.tpre){const p=TPRESETS.find(x=>x.id===b.dataset.tpre);if(p){tc=JSON.parse(JSON.stringify(p.cfg));saveTc();render();tStart()}return true}
   if(b.id==="t-start"){tStart();return true}
   if(b.id==="t-pause"){if(T.pauseAt){T.t0+=Date.now()-T.pauseAt;T.pauseAt=0}else T.pauseAt=Date.now();tTick();return true}
   if(b.id==="t-skip"){const seg=T.seq[T.i];T.t0=tNow()-seg.dur*1000;tTick();return true}
